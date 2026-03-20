@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Project, UserProfile, OperationType } from '../types';
-import { Plus, Trash2, FolderKanban } from 'lucide-react';
+import { Project, UserProfile, OperationType, Lead } from '../types';
+import { Plus, Trash2, FolderKanban, Users, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ProjectListProps {
   user: UserProfile;
+  leads: Lead[];
   onProjectClick?: (projectId: string) => void;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ user, onProjectClick }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProjectClick }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -136,36 +137,70 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, onProjectClick }
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((project) => (
-          <div
-            key={project.id}
-            onClick={() => onProjectClick?.(project.id)}
-            className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group cursor-pointer hover:border-emerald-200"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-slate-900 text-lg">{project.name}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                    Mã: {project.abbreviation}
-                  </span>
+        {projects.map((project) => {
+          const projectLeads = leads.filter(l => l.projectId === project.id);
+          const contactedLeads = projectLeads.filter(l => l.status === 'Đã liên hệ').length;
+          const closedLeads = projectLeads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length;
+
+          return (
+            <div
+              key={project.id}
+              onClick={() => onProjectClick?.(project.id)}
+              className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all group cursor-pointer hover:border-emerald-200"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-lg">{project.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                      Mã: {project.abbreviation}
+                    </span>
+                  </div>
+                </div>
+                {(user.role === 'admin' || user.role === 'manager') && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteProject(project.id);
+                    }}
+                    className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-slate-50 p-2 rounded-lg text-center">
+                  <div className="flex justify-center mb-1">
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-900">{projectLeads.length}</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-medium">Khách</p>
+                </div>
+                <div className="bg-emerald-50 p-2 rounded-lg text-center">
+                  <div className="flex justify-center mb-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  </div>
+                  <p className="text-xs font-bold text-emerald-700">{contactedLeads}</p>
+                  <p className="text-[9px] text-emerald-600 uppercase font-medium">Đã LH</p>
+                </div>
+                <div className="bg-blue-50 p-2 rounded-lg text-center">
+                  <div className="flex justify-center mb-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                  </div>
+                  <p className="text-xs font-bold text-blue-700">{closedLeads}</p>
+                  <p className="text-[9px] text-blue-600 uppercase font-medium">Chốt</p>
                 </div>
               </div>
-              {(user.role === 'admin' || user.role === 'manager') && (
-                <button
-                  onClick={() => handleDeleteProject(project.id)}
-                  className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+
+              <div className="pt-4 border-t border-slate-50 flex justify-between items-center text-[10px] text-slate-400">
+                <span>Tạo bởi: {project.createdByEmail.split('@')[0]}</span>
+                <span>{new Date(project.createdAt).toLocaleDateString('vi-VN')}</span>
+              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center text-xs text-slate-400">
-              <span>Tạo bởi: {project.createdByEmail}</span>
-              <span>{new Date(project.createdAt).toLocaleDateString('vi-VN')}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {projects.length === 0 && !isAdding && (
           <div className="col-span-full text-center py-12 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
             <FolderKanban className="w-12 h-12 text-slate-300 mx-auto mb-3" />
