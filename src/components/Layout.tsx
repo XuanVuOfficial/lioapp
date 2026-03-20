@@ -17,6 +17,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, roles: ['admin', 'manager', 'staff'] },
     { id: 'leads', label: 'Khách hàng', icon: UserPlus, roles: ['admin', 'manager', 'staff'] },
+    { id: 'projects', label: 'Dự án', icon: Briefcase, roles: ['admin', 'manager'] },
     { id: 'departments', label: 'Phòng ban', icon: Users, roles: ['admin', 'manager'] },
     { id: 'staff', label: 'Nhân viên', icon: UserCircle, roles: ['admin', 'manager'] },
   ];

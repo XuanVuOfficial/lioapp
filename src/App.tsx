@@ -9,6 +9,7 @@ import { Dashboard } from './components/Dashboard';
 import { DepartmentHierarchy } from './components/DepartmentHierarchy';
 import { LeadList } from './components/LeadList';
 import { StaffList } from './components/StaffList';
+import { ProjectList } from './components/ProjectList';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
@@ -85,6 +86,8 @@ export default function App() {
         return <DepartmentHierarchy departments={departments} user={user} allUsers={staff} />;
       case 'leads':
         return <LeadList leads={leads} departments={departments} user={user} staff={staff} />;
+      case 'projects':
+        return <ProjectList user={user} />;
       case 'staff':
         return <StaffList users={staff} departments={departments} currentUser={user} />;
       default:

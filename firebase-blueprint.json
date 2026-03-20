@@ -24,10 +24,15 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the lead was created." },
         "assignedToEmail": { "type": "string", "format": "email", "description": "Email of the staff member assigned to this lead." },
         "departmentId": { "type": "string", "description": "ID of the department this lead belongs to." },
+        "projectId": { "type": "string", "description": "ID of the project this lead belongs to." },
+        "customerCode": { "type": "string", "description": "Automatically generated customer code (e.g., tp01)." },
         "customerName": { "type": "string", "description": "Name of the customer." },
         "phone": { "type": "string", "description": "Phone number of the customer." },
         "email": { "type": "string", "format": "email", "description": "Email of the customer." },
-        "status": { "type": "string", "description": "Current status of the lead (e.g., Not Contacted, Contacted)." },
+        "status": { "type": "string", "description": "Current status of the lead (e.g., Chưa liên hệ, Không liên hệ được, Đã liên hệ)." },
+        "subStatus": { "type": "string", "description": "Sub-status based on the main status." },
+        "appointmentStatus": { "type": "string", "description": "Status of customer appointment." },
+        "resultStatus": { "type": "string", "description": "Final result status." },
         "details": { "type": "string", "description": "Detailed description or requirements." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last update." },
         "updatedByEmail": { "type": "string", "format": "email", "description": "Email of the user who last updated the lead." },
@@ -37,6 +42,19 @@
         "history": { "type": "array", "items": { "type": "string" }, "description": "History of updates or comments." }
       },
       "required": ["id", "customerName", "phone", "creatorEmail", "createdAt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A project for categorizing leads and generating customer codes.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the project." },
+        "name": { "type": "string", "description": "Name of the project." },
+        "abbreviation": { "type": "string", "description": "Abbreviation used for generating customer codes." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the project was created." },
+        "createdByEmail": { "type": "string", "format": "email", "description": "Email of the user who created the project." }
+      },
+      "required": ["id", "name", "abbreviation", "createdAt", "createdByEmail"]
     },
     "User": {
       "title": "User",
@@ -56,6 +74,7 @@
   "firestore": {
     "departments": { "schema": "Department", "description": "Collection of hierarchical departments." },
     "leads": { "schema": "Lead", "description": "Collection of sales leads." },
+    "projects": { "schema": "Project", "description": "Collection of projects." },
     "users": { "schema": "User", "description": "Collection of user profiles." }
   }
 }

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check } from 'lucide-react';
-import { Lead, Department, UserProfile } from '../types';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban } from 'lucide-react';
+import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead } from '../services/leadService';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface Props {
   leads: Lead[];
@@ -17,20 +19,48 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAssignModal, setShowAssignModal] = useState<Lead | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [newNote, setNewNote] = useState('');
   const [newLead, setNewLead] = useState<Partial<Lead>>({
     customerName: '',
     phone: '',
     email: '',
-    status: 'Chưa Liên Hệ',
-    interestLevel: 'Chưa Lên Nhà Mẫu',
+    status: 'Chưa liên hệ',
+    subStatus: '',
+    appointmentStatus: '',
+    resultStatus: '',
     details: '',
     notes: '',
     departmentId: user.departmentId || '',
+    projectId: '',
     assignedToEmail: ''
   });
 
-  const statuses = ['Tất cả', 'Chưa Liên Hệ', 'Đã Liên Hệ', 'Đang Tư Vấn', 'Tiềm Năng', 'Đã Chốt', 'Tạm Hoãn', 'Hủy'];
-  const interestLevels = ['Chưa Lên Nhà Mẫu', 'Đã Lên Nhà Mẫu', 'Đã Đặt Cọc', 'Đã Ký Hợp Đồng'];
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const q = query(collection(db, 'projects'), orderBy('name', 'asc'));
+      const snapshot = await getDocs(q);
+      const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
+      setProjects(projectsData);
+    };
+    fetchProjects();
+  }, []);
+
+  const statuses = ['Tất cả', 'Chưa liên hệ', 'Không liên hệ được', 'Đã liên hệ'];
+  const subStatuses = {
+    'Không liên hệ được': ['Thuê bao', 'Không bắt máy', 'Bận'],
+    'Đã liên hệ': ['Đang tư vấn', 'Rác / Không quan tâm']
+  };
+  const appointmentOptions = [
+    'Chưa gặp khách / Chưa lên nhà mẫu',
+    'Đã gặp khách / Chưa lên nhà mẫu',
+    'Đã gặp khách / Đã lên nhà mẫu'
+  ];
+  const resultOptions = [
+    'Chưa booking',
+    'Đã booking',
+    'Đã cọc'
+  ];
 
   const filteredLeads = leads.filter(l => {
     const matchesSearch = 
@@ -44,23 +74,53 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
   });
 
   const handleCreate = async () => {
-    if (!newLead.customerName || !newLead.phone || !newLead.email) return;
+    if (!newLead.customerName || !newLead.phone) return;
+
+    let customerCode = '';
+    let finalDepartmentId = newLead.departmentId;
+
+    if (newLead.assignedToEmail) {
+      const assignedStaff = staff.find(s => s.email === newLead.assignedToEmail);
+      if (assignedStaff && assignedStaff.departmentId) {
+        finalDepartmentId = assignedStaff.departmentId;
+      }
+    }
+
+    if (newLead.projectId) {
+      const selectedProject = projects.find(p => p.id === newLead.projectId);
+      if (selectedProject) {
+        const q = query(collection(db, 'leads'), where('projectId', '==', newLead.projectId));
+        const snapshot = await getDocs(q);
+        const count = snapshot.size;
+        customerCode = `${selectedProject.abbreviation}${(count + 1).toString().padStart(2, '0')}`;
+      }
+    }
+
+    const history = [];
+    if (newLead.details) {
+      history.push(`[${new Date().toLocaleString()}] ${user.displayName || user.email}: ${newLead.details}`);
+    }
+
     await createLead({
       customerName: newLead.customerName!,
       phone: newLead.phone!,
-      email: newLead.email!,
+      email: newLead.email || '',
       status: newLead.status!,
-      interestLevel: newLead.interestLevel,
-      details: newLead.details,
+      subStatus: newLead.subStatus,
+      appointmentStatus: newLead.appointmentStatus,
+      resultStatus: newLead.resultStatus,
+      details: '', // Clear details as we use history now
       notes: newLead.notes,
-      departmentId: newLead.departmentId,
+      departmentId: finalDepartmentId,
+      projectId: newLead.projectId,
+      customerCode: customerCode,
       assignedToEmail: newLead.assignedToEmail,
       creatorEmail: user.email,
       updatedByEmail: user.email,
-      history: []
+      history: history
     });
     setShowAddModal(false);
-    setNewLead({ status: 'Chưa Liên Hệ', interestLevel: 'Chưa Lên Nhà Mẫu', departmentId: user.departmentId || '', assignedToEmail: '' });
+    setNewLead({ status: 'Chưa liên hệ', subStatus: '', appointmentStatus: '', resultStatus: '', departmentId: user.departmentId || '', projectId: '', assignedToEmail: '' });
   };
 
   const handleUpdateStatus = async (lead: Lead, status: string) => {
@@ -148,7 +208,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight">{lead.customerName}</h3>
-                      <p className="text-[10px] md:text-xs text-slate-500">Mã: {lead.id.slice(0, 8)}</p>
+                      <p className="text-[10px] md:text-xs text-slate-500">
+                        {lead.customerCode ? `Mã KH: ${lead.customerCode}` : `ID: ${lead.id.slice(0, 8)}`}
+                      </p>
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -180,18 +242,31 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                   )}
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Tag className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${
-                      lead.status === 'Chưa Liên Hệ' ? 'bg-slate-100 text-slate-600' :
-                      lead.status === 'Đã Liên Hệ' ? 'bg-blue-50 text-blue-600' :
-                      'bg-emerald-50 text-emerald-600'
-                    }`}>
-                      {lead.status}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${
+                        lead.status === 'Chưa liên hệ' ? 'bg-slate-100 text-slate-600' :
+                        lead.status === 'Không liên hệ được' ? 'bg-red-50 text-red-600' :
+                        'bg-emerald-50 text-emerald-600'
+                      }`}>
+                        {lead.status}
+                      </span>
+                      {lead.subStatus && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600">
+                          {lead.subStatus}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Briefcase className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
                     <span className="truncate">{departments.find(d => d.id === lead.departmentId)?.name || 'Chưa có phòng ban'}</span>
                   </div>
+                  {lead.projectId && (
+                    <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
+                      <FolderKanban className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
+                      <span className="truncate">{projects.find(p => p.id === lead.projectId)?.name || 'Dự án không tồn tại'}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
                     {new Date(lead.updatedAt).toLocaleDateString()}
@@ -258,14 +333,18 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Địa chỉ Email *</label>
-                  <input 
-                    type="email" 
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Dự án quan tâm *</label>
+                  <select 
                     required
-                    value={newLead.email}
-                    onChange={e => setNewLead(prev => ({ ...prev, email: e.target.value }))}
+                    value={newLead.projectId}
+                    onChange={e => setNewLead(prev => ({ ...prev, projectId: e.target.value }))}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  />
+                  >
+                    <option value="">Chọn dự án</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.abbreviation})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="space-y-4">
@@ -282,25 +361,21 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho phòng ban</label>
-                  <select 
-                    value={newLead.departmentId}
-                    onChange={e => setNewLead(prev => ({ ...prev, departmentId: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  >
-                    <option value="">Chọn phòng ban</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
                     <select 
                       value={newLead.status}
-                      onChange={e => setNewLead(prev => ({ ...prev, status: e.target.value }))}
+                      onChange={e => {
+                        const status = e.target.value;
+                        setNewLead(prev => ({ 
+                          ...prev, 
+                          status, 
+                          subStatus: '', 
+                          appointmentStatus: '', 
+                          resultStatus: '' 
+                        }));
+                      }}
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     >
                       {statuses.filter(s => s !== 'Tất cả').map(s => (
@@ -308,27 +383,70 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Mức độ quan tâm</label>
-                    <select 
-                      value={newLead.interestLevel}
-                      onChange={e => setNewLead(prev => ({ ...prev, interestLevel: e.target.value }))}
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                    >
-                      {interestLevels.map(i => (
-                        <option key={i} value={i}>{i}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {newLead.status && subStatuses[newLead.status as keyof typeof subStatuses] && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Chi tiết trạng thái</label>
+                      <select 
+                        value={newLead.subStatus}
+                        onChange={e => {
+                          const subStatus = e.target.value;
+                          setNewLead(prev => ({ 
+                            ...prev, 
+                            subStatus,
+                            appointmentStatus: '',
+                            resultStatus: ''
+                          }));
+                        }}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      >
+                        <option value="">Chọn chi tiết</option>
+                        {subStatuses[newLead.status as keyof typeof subStatuses].map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
+
+                {newLead.subStatus === 'Đang tư vấn' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Hẹn khách</label>
+                      <select 
+                        value={newLead.appointmentStatus}
+                        onChange={e => setNewLead(prev => ({ ...prev, appointmentStatus: e.target.value }))}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      >
+                        <option value="">Chọn trạng thái hẹn</option>
+                        {appointmentOptions.map(o => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Kết quả</label>
+                      <select 
+                        value={newLead.resultStatus}
+                        onChange={e => setNewLead(prev => ({ ...prev, resultStatus: e.target.value }))}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      >
+                        <option value="">Chọn kết quả</option>
+                        {resultOptions.map(o => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-6">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Chi tiết / Ghi chú</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ghi chú ban đầu</label>
               <textarea 
                 rows={3}
                 value={newLead.details}
                 onChange={e => setNewLead(prev => ({ ...prev, details: e.target.value }))}
+                placeholder="Nhập ghi chú ban đầu cho khách hàng..."
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
               />
             </div>
@@ -447,7 +565,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                 </div>
                 <div>
                   <h3 className="text-3xl font-bold text-slate-900">{selectedLead.customerName}</h3>
-                  <p className="text-slate-500">Mã khách hàng: {selectedLead.id}</p>
+                  <p className="text-slate-500">
+                    {selectedLead.customerCode ? `Mã khách hàng: ${selectedLead.customerCode}` : `ID: ${selectedLead.id}`}
+                  </p>
                 </div>
               </div>
               <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-100 rounded-lg">
@@ -478,7 +598,17 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                       <label className="block text-xs text-slate-500 mb-1">Trạng thái</label>
                       <select 
                         value={selectedLead.status}
-                        onChange={e => handleUpdateStatus(selectedLead, e.target.value)}
+                        onChange={async (e) => {
+                          const status = e.target.value;
+                          const updates = { 
+                            status, 
+                            subStatus: '', 
+                            appointmentStatus: '', 
+                            resultStatus: '' 
+                          };
+                          await updateLead(selectedLead.id, updates, user.email);
+                          setSelectedLead({ ...selectedLead, ...updates });
+                        }}
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       >
                         {statuses.filter(s => s !== 'Tất cả').map(s => (
@@ -486,51 +616,134 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Mức độ quan tâm</label>
-                      <select 
-                        value={selectedLead.interestLevel}
-                        onChange={async (e) => {
-                          const interestLevel = e.target.value;
-                          await updateLead(selectedLead.id, { interestLevel }, user.email);
-                          setSelectedLead({ ...selectedLead, interestLevel });
-                        }}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      >
-                        {interestLevels.map(i => (
-                          <option key={i} value={i}>{i}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {selectedLead.status && subStatuses[selectedLead.status as keyof typeof subStatuses] && (
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Chi tiết trạng thái</label>
+                        <select 
+                          value={selectedLead.subStatus || ''}
+                          onChange={async (e) => {
+                            const subStatus = e.target.value;
+                            const updates = { 
+                              subStatus,
+                              appointmentStatus: '',
+                              resultStatus: ''
+                            };
+                            await updateLead(selectedLead.id, updates, user.email);
+                            setSelectedLead({ ...selectedLead, ...updates });
+                          }}
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        >
+                          <option value="">Chọn chi tiết</option>
+                          {subStatuses[selectedLead.status as keyof typeof subStatuses].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
+
+                  {selectedLead.subStatus === 'Đang tư vấn' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Hẹn khách</label>
+                        <select 
+                          value={selectedLead.appointmentStatus || ''}
+                          onChange={async (e) => {
+                            const appointmentStatus = e.target.value;
+                            await updateLead(selectedLead.id, { appointmentStatus }, user.email);
+                            setSelectedLead({ ...selectedLead, appointmentStatus });
+                          }}
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        >
+                          <option value="">Chọn trạng thái hẹn</option>
+                          {appointmentOptions.map(o => (
+                            <option key={o} value={o}>{o}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Kết quả</label>
+                        <select 
+                          value={selectedLead.resultStatus || ''}
+                          onChange={async (e) => {
+                            const resultStatus = e.target.value;
+                            await updateLead(selectedLead.id, { resultStatus }, user.email);
+                            setSelectedLead({ ...selectedLead, resultStatus });
+                          }}
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        >
+                          <option value="">Chọn kết quả</option>
+                          {resultOptions.map(o => (
+                            <option key={o} value={o}>{o}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">Chi tiết / Ghi chú</label>
-                      <textarea 
-                        rows={4}
-                        value={selectedLead.details || ''}
-                        onChange={e => setSelectedLead({ ...selectedLead, details: e.target.value })}
-                        onBlur={async () => {
-                          await updateLead(selectedLead.id, { details: selectedLead.details }, user.email);
-                        }}
-                        placeholder="Nhập chi tiết hoặc ghi chú mới..."
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      />
+                      <label className="block text-xs text-slate-500 mb-2">Thêm ghi chú mới (Timeline)</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          value={newNote}
+                          onChange={e => setNewNote(e.target.value)}
+                          onKeyPress={async (e) => {
+                            if (e.key === 'Enter' && newNote.trim()) {
+                              const timestamp = new Date().toLocaleString();
+                              const entry = `[${timestamp}] ${user.displayName || user.email}: ${newNote}`;
+                              const updatedHistory = [...selectedLead.history, entry];
+                              await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
+                              setSelectedLead({ ...selectedLead, history: updatedHistory });
+                              setNewNote('');
+                            }
+                          }}
+                          placeholder="Nhập nội dung trao đổi..."
+                          className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                        />
+                        <button 
+                          onClick={async () => {
+                            if (!newNote.trim()) return;
+                            const timestamp = new Date().toLocaleString();
+                            const entry = `[${timestamp}] ${user.displayName || user.email}: ${newNote}`;
+                            const updatedHistory = [...selectedLead.history, entry];
+                            await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
+                            setSelectedLead({ ...selectedLead, history: updatedHistory });
+                            setNewNote('');
+                          }}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-all"
+                        >
+                          Gửi
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </section>
 
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <History className="w-4 h-4" /> Lịch sử
+                    <History className="w-4 h-4" /> Lịch sử trao đổi
                   </h4>
-                  <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                    {selectedLead.history.map((entry, i) => (
-                      <div key={i} className="flex gap-3 text-sm">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                        <p className="text-slate-600">{entry}</p>
-                      </div>
-                    ))}
+                  <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                    {selectedLead.history.slice().reverse().map((entry, i) => {
+                      const parts = entry.match(/^\[(.*?)\] (.*?): (.*)$/);
+                      if (parts) {
+                        return (
+                          <div key={i} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{parts[2]}</span>
+                              <span className="text-[10px] text-slate-400">{parts[1]}</span>
+                            </div>
+                            <p className="text-sm text-slate-700 leading-relaxed">{parts[3]}</p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={i} className="flex gap-3 text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <p className="text-slate-600">{entry}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
               </div>
@@ -541,17 +754,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
                   <div className="space-y-4">
                     <div>
                       <p className="text-xs text-slate-500 mb-2">Trạng thái hiện tại</p>
-                      <select 
-                        value={selectedLead.status}
-                        onChange={e => handleUpdateStatus(selectedLead, e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      >
-                        <option value="Chưa Liên Hệ">Chưa Liên Hệ</option>
-                        <option value="Đã Liên Hệ">Đã Liên Hệ</option>
-                        <option value="Đang Tư Vấn">Đang Tư Vấn</option>
-                        <option value="Tiềm Năng">Tiềm Năng</option>
-                        <option value="Đã Chốt">Đã Chốt</option>
-                      </select>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium border border-emerald-100">
+                          {selectedLead.status}
+                        </span>
+                        {selectedLead.subStatus && (
+                          <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-100">
+                            {selectedLead.subStatus}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 mb-2">Được giao cho</p>

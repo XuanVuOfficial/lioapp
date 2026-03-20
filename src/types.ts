@@ -18,16 +18,29 @@ export interface Department {
   level: number;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  abbreviation: string;
+  createdAt: string;
+  createdByEmail: string;
+}
+
 export interface Lead {
   id: string;
   creatorEmail: string;
   createdAt: string;
   assignedToEmail?: string;
   departmentId?: string;
+  projectId?: string;
+  customerCode?: string;
   customerName: string;
   phone: string;
   email?: string;
   status: string;
+  subStatus?: string;
+  appointmentStatus?: string;
+  resultStatus?: string;
   details?: string;
   updatedAt: string;
   updatedByEmail: string;
