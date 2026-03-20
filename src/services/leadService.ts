@@ -30,11 +30,14 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
     const docRef = doc(db, COLLECTION, id);
     const now = new Date().toISOString();
     
-    // Get current lead to append to history
-    const docSnap = await getDoc(docRef);
-    const currentHistory = docSnap.exists() ? (docSnap.data() as Lead).history : [];
-    const historyEntry = `Cập nhật bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
-    const newHistory = [...currentHistory, historyEntry];
+    // Get current lead to append to history if not provided in updates
+    let newHistory = updates.history;
+    if (!newHistory) {
+      const docSnap = await getDoc(docRef);
+      const currentHistory = docSnap.exists() ? (docSnap.data() as Lead).history : [];
+      const historyEntry = `Cập nhật bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
+      newHistory = [...currentHistory, historyEntry];
+    }
 
     const updateData: any = {
       ...updates,
@@ -103,7 +106,7 @@ export const subscribeToLeads = (role: string, email: string, departmentId: stri
   }
 
   return onSnapshot(q, (snapshot) => {
-    const leads = snapshot.docs.map(doc => doc.data() as Lead);
+    const leads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Lead);
     callback(leads);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, COLLECTION);

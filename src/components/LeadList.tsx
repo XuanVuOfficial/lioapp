@@ -41,6 +41,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     assignedToEmail: ''
   });
 
+  // Sync selectedLead with latest leads data
+  useEffect(() => {
+    if (selectedLead) {
+      const updatedLead = leads.find(l => l.id === selectedLead.id);
+      if (updatedLead) {
+        setSelectedLead(updatedLead);
+      }
+    }
+  }, [leads]);
+
   useEffect(() => {
     const fetchProjects = async () => {
       const q = query(collection(db, 'projects'), orderBy('name', 'asc'));
@@ -744,7 +754,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <div className="md:col-span-2 space-y-8">
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Thông tin liên hệ</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="bg-slate-50 p-4 rounded-xl">
                       <p className="text-xs text-slate-500 mb-1">Điện thoại</p>
                       <p className="font-semibold text-slate-900">{selectedLead.phone}</p>
@@ -754,6 +764,12 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                       <p className="font-semibold text-slate-900">{selectedLead.email || 'N/A'}</p>
                     </div>
                   </div>
+                  {selectedLead.notes && (
+                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                      <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mb-1">Ghi chú ban đầu</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">{selectedLead.notes}</p>
+                    </div>
+                  )}
                 </section>
 
                 <section>
