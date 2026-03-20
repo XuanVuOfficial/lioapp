@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
 import { UserProfile, Department, Lead } from './types';
 import { getUserProfile, createUserProfile, subscribeToUsersByDepartment, getUserProfileByEmail, subscribeToAllUsers } from './services/userService';
 import { subscribeToDepartments } from './services/departmentService';
@@ -14,7 +12,7 @@ import { StaffList } from './components/StaffList';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
-const ADMIN_EMAIL = 'xuan.vu.official@gmail.com';
+const ADMIN_EMAIL = 'admin@salespro.com';
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -25,44 +23,26 @@ export default function App() {
   const [staff, setStaff] = useState<UserProfile[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        let profile = await getUserProfile(firebaseUser.uid);
-        
-        if (!profile) {
-          // Check if a profile with this email was pre-created
-          const existingProfile = await getUserProfileByEmail(firebaseUser.email || '');
-          
-          if (existingProfile) {
-            // Update the existing profile with the new UID
-            profile = {
-              ...existingProfile,
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName || existingProfile.displayName
-            };
-            await createUserProfile(profile);
-            // If the old profile was under a different ID (pre-created), we might want to delete it
-            // but for simplicity, we're just creating/updating the one at doc(firebaseUser.uid)
-          } else {
-            profile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || 'User',
-              role: firebaseUser.email === ADMIN_EMAIL ? 'admin' : 'staff',
-            };
-            await createUserProfile(profile);
-          }
+    const checkSession = async () => {
+      const storedUid = localStorage.getItem('salespro_uid');
+      if (storedUid) {
+        const profile = await getUserProfile(storedUid);
+        if (profile) {
+          setUser(profile);
+        } else {
+          localStorage.removeItem('salespro_uid');
         }
-        
-        setUser(profile);
-      } else {
-        setUser(null);
       }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    checkSession();
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('salespro_uid');
+    setUser(null);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -93,7 +73,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <Auth />;
+    return <Auth onLogin={setUser} />;
   }
 
   const renderContent = () => {
@@ -113,7 +93,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <Layout user={user} activeTab={activeTab} setActiveTab={setActiveTab}>
+      <Layout user={user} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout}>
         {renderContent()}
       </Layout>
     </ErrorBoundary>

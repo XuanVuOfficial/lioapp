@@ -2,16 +2,16 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle } from 'lucide-react';
 import { UserProfile } from '../types';
-import { logOut } from '../firebase';
 
 interface LayoutProps {
   user: UserProfile | null;
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onLogout: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setActiveTab }) => {
+export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setActiveTab, onLogout }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const navItems = [
@@ -86,7 +86,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
               </div>
             </div>
             <button
-              onClick={logOut}
+              onClick={onLogout}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors mb-2"
             >
               <LogOut className="w-4 h-4" />

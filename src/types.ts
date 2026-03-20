@@ -6,6 +6,7 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   departmentId?: string;
+  password?: string;
 }
 
 export interface Department {

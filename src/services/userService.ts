@@ -32,6 +32,20 @@ export const getUserProfileByEmail = async (email: string): Promise<UserProfile 
   }
 };
 
+export const verifyCredentials = async (email: string, pass: string): Promise<UserProfile | null> => {
+  try {
+    const q = query(collection(db, COLLECTION), where('email', '==', email), where('password', '==', pass));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].data() as UserProfile;
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, COLLECTION);
+    return null;
+  }
+};
+
 export const createUserProfile = async (profile: UserProfile): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION, profile.uid);
@@ -42,6 +56,20 @@ export const createUserProfile = async (profile: UserProfile): Promise<void> => 
     await setDoc(docRef, data);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `${COLLECTION}/${profile.uid}`);
+  }
+};
+
+export const createStaffAccount = async (profile: Omit<UserProfile, 'uid'>, password: string): Promise<void> => {
+  try {
+    const uid = 'user_' + Math.random().toString(36).substr(2, 9);
+    await createUserProfile({
+      ...profile,
+      uid,
+      password
+    });
+  } catch (error) {
+    console.error('Error creating staff account:', error);
+    throw error;
   }
 };
 

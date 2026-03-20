@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check } from 'lucide-react';
+import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check, Lock } from 'lucide-react';
 import { UserProfile, Department, UserRole } from '../types';
-import { createUserProfile, updateUserRole, deleteUser } from '../services/userService';
+import { createStaffAccount, updateUserRole, deleteUser } from '../services/userService';
 
 interface Props {
   users: UserProfile[];
@@ -14,9 +14,11 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [newUser, setNewUser] = useState({
     email: '',
     displayName: '',
+    password: '',
     role: 'staff' as UserRole,
     departmentId: ''
   });
@@ -27,20 +29,27 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   );
 
   const handleCreate = async () => {
-    if (!newUser.email || !newUser.displayName) return;
+    if (!newUser.email || !newUser.displayName || !newUser.password) {
+      alert('Vui lòng điền đầy đủ thông tin và mật khẩu');
+      return;
+    }
     
-    // Create a profile with a random ID (will be updated when they log in)
-    const uid = 'pre_' + Math.random().toString(36).substr(2, 9);
-    await createUserProfile({
-      uid,
-      email: newUser.email,
-      displayName: newUser.displayName,
-      role: newUser.role,
-      departmentId: newUser.departmentId || undefined
-    });
-    
-    setShowAddModal(false);
-    setNewUser({ email: '', displayName: '', role: 'staff', departmentId: '' });
+    setIsLoading(true);
+    try {
+      await createStaffAccount({
+        email: newUser.email,
+        displayName: newUser.displayName,
+        role: newUser.role,
+        departmentId: newUser.departmentId || undefined
+      }, newUser.password);
+      
+      setShowAddModal(false);
+      setNewUser({ email: '', displayName: '', password: '', role: 'staff', departmentId: '' });
+    } catch (error: any) {
+      alert('Lỗi khi tạo tài khoản: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -233,6 +242,19 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu truy cập</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="password" 
+                      value={newUser.password}
+                      onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      placeholder="Nhập mật khẩu cho nhân viên"
+                    />
+                  </div>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Vai trò</label>
                   <select 
                     value={newUser.role}
@@ -268,8 +290,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 </button>
                 <button 
                   onClick={handleCreate}
-                  className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100"
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : null}
                   Tạo
                 </button>
               </div>
