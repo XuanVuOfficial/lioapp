@@ -10,6 +10,7 @@ import { DepartmentHierarchy } from './components/DepartmentHierarchy';
 import { LeadList } from './components/LeadList';
 import { StaffList } from './components/StaffList';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'admin@salespro.com';
@@ -96,6 +97,7 @@ export default function App() {
       <Layout user={user} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout}>
         {renderContent()}
       </Layout>
+      <PWAInstallPrompt />
     </ErrorBoundary>
   );
 }
