@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (required)
+    //   - role: string (required, enum: ['admin', 'manager', 'staff'])
+    //   - departmentId: string (optional)
+    //
+    // Collection: departments
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - managerEmail: string (required)
+    //   - managerName: string (required)
+    //   - parentId: string (optional)
+    //   - level: number (required)
+    //
+    // Collection: leads
+    // Fields:
+    //   - id: string (required)
+    //   - creatorEmail: string (required)
+    //   - createdAt: timestamp (required)
+    //   - assignedToEmail: string (optional)
+    //   - departmentId: string (optional)
+    //   - customerName: string (required)
+    //   - phone: string (required)
+    //   - email: string (optional)
+    //   - status: string (required)
+    //   - details: string (optional)
+    //   - updatedAt: timestamp (required)
+    //   - updatedByEmail: string (required)
+    //   - imageUrl: string (optional)
+    //   - interestLevel: string (optional)
+    //   - notes: string (optional)
+    //   - history: list (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ( (request.auth.token.email == "xuan.vu.official@gmail.com" && request.auth.token.email_verified == true) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') );
+    }
+
+    function isManager() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager';
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Collection: users
+    // ===============================================================
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid is string && data.uid.size() > 0 &&
+               data.email is string && isValidEmail(data.email) &&
+               data.displayName is string && data.displayName.size() > 0 &&
+               data.role in ['admin', 'manager', 'staff'] &&
+               (!('departmentId' in data) || data.departmentId is string);
+      }
+
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'staff' || isAdmin());
+      allow update: if isAuthenticated() && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Collection: departments
+    // ===============================================================
+    match /departments/{deptId} {
+      function isValidDepartment(data) {
+        return data.id is string && data.id.size() > 0 &&
+               data.name is string && data.name.size() > 0 &&
+               data.managerEmail is string && isValidEmail(data.managerEmail) &&
+               data.managerName is string && data.managerName.size() > 0 &&
+               (!('parentId' in data) || data.parentId is string) &&
+               data.level is int;
+      }
+
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidDepartment(request.resource.data);
+      allow update: if isAdmin() && isValidDepartment(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Collection: leads
+    // ===============================================================
+    match /leads/{leadId} {
+      function isValidLead(data) {
+        return data.id is string && data.id.size() > 0 &&
+               data.customerName is string && data.customerName.size() > 0 &&
+               data.phone is string && data.phone.size() > 0 &&
+               data.creatorEmail is string && isValidEmail(data.creatorEmail) &&
+               data.status is string &&
+               data.history is list &&
+               data.updatedByEmail is string && isValidEmail(data.updatedByEmail);
+      }
+
+      function canReadLead() {
+        let user = getUserData();
+        return isAdmin() || 
+               (user.role == 'manager' && (resource.data.departmentId == user.departmentId || resource.data.creatorEmail == user.email)) ||
+               (user.role == 'staff' && resource.data.assignedToEmail == user.email);
+      }
+
+      allow read: if isAuthenticated() && canReadLead();
+      allow create: if isAuthenticated() && isValidLead(request.resource.data);
+      allow update: if isAuthenticated() && isValidLead(request.resource.data) && (
+                      isAdmin() || 
+                      (getUserData().role == 'manager' && resource.data.departmentId == getUserData().departmentId) ||
+                      (resource.data.assignedToEmail == request.auth.token.email)
+                    );
+      allow delete: if isAdmin() || (isManager() && resource.data.departmentId == getUserData().departmentId);
+    }
+  }
+}

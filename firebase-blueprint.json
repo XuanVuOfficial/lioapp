@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "Department": {
+      "title": "Department",
+      "description": "A hierarchical department in the sales organization.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the department." },
+        "name": { "type": "string", "description": "Name of the department (e.g., General Floor, Floor Name)." },
+        "managerEmail": { "type": "string", "format": "email", "description": "Email of the department manager." },
+        "managerName": { "type": "string", "description": "Name of the department manager." },
+        "parentId": { "type": "string", "description": "ID of the parent department, if any." },
+        "level": { "type": "integer", "description": "Hierarchy level (0 for root, 1 for sub, etc.)" }
+      },
+      "required": ["id", "name", "managerEmail", "managerName"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A sales lead or customer entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the lead." },
+        "creatorEmail": { "type": "string", "format": "email", "description": "Email of the user who created the lead." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the lead was created." },
+        "assignedToEmail": { "type": "string", "format": "email", "description": "Email of the staff member assigned to this lead." },
+        "departmentId": { "type": "string", "description": "ID of the department this lead belongs to." },
+        "customerName": { "type": "string", "description": "Name of the customer." },
+        "phone": { "type": "string", "description": "Phone number of the customer." },
+        "email": { "type": "string", "format": "email", "description": "Email of the customer." },
+        "status": { "type": "string", "description": "Current status of the lead (e.g., Not Contacted, Contacted)." },
+        "details": { "type": "string", "description": "Detailed description or requirements." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last update." },
+        "updatedByEmail": { "type": "string", "format": "email", "description": "Email of the user who last updated the lead." },
+        "imageUrl": { "type": "string", "description": "URL to an image associated with the lead." },
+        "interestLevel": { "type": "string", "description": "Customer's level of interest." },
+        "notes": { "type": "string", "description": "General notes about the lead." },
+        "history": { "type": "array", "items": { "type": "string" }, "description": "History of updates or comments." }
+      },
+      "required": ["id", "customerName", "phone", "creatorEmail", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "displayName": { "type": "string", "description": "User's display name." },
+        "role": { "type": "string", "enum": ["admin", "manager", "staff"], "description": "User's role in the system." },
+        "departmentId": { "type": "string", "description": "ID of the department the user belongs to." }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "departments": { "schema": "Department", "description": "Collection of hierarchical departments." },
+    "leads": { "schema": "Lead", "description": "Collection of sales leads." },
+    "users": { "schema": "User", "description": "Collection of user profiles." }
+  }
+}
