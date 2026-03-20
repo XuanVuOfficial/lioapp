@@ -23,6 +23,7 @@ export default function App() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [staff, setStaff] = useState<UserProfile[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -85,9 +86,17 @@ export default function App() {
       case 'departments':
         return <DepartmentHierarchy departments={departments} user={user} allUsers={staff} />;
       case 'leads':
-        return <LeadList leads={leads} departments={departments} user={user} staff={staff} />;
+        return <LeadList leads={leads} departments={departments} user={user} staff={staff} initialProjectId={selectedProjectId || undefined} />;
       case 'projects':
-        return <ProjectList user={user} />;
+        return (
+          <ProjectList 
+            user={user} 
+            onProjectClick={(projectId) => {
+              setSelectedProjectId(projectId);
+              setActiveTab('leads');
+            }} 
+          />
+        );
       case 'staff':
         return <StaffList users={staff} departments={departments} currentUser={user} />;
       default:

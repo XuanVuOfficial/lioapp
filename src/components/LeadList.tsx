@@ -6,19 +6,24 @@ import { createLead, updateLead, assignLead } from '../services/leadService';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
 interface Props {
   leads: Lead[];
   departments: Department[];
   user: UserProfile;
   staff: UserProfile[];
+  initialProjectId?: string;
 }
 
-export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) => {
+export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, initialProjectId }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAssignModal, setShowAssignModal] = useState<Lead | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
+  const [showStats, setShowStats] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [newNote, setNewNote] = useState('');
   const [newLead, setNewLead] = useState<Partial<Lead>>({
@@ -69,9 +74,25 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
       l.email?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = currentTab === 'Tất cả' || l.status === currentTab;
+    const matchesProject = !selectedProjectId || l.projectId === selectedProjectId;
     
-    return matchesSearch && matchesTab;
+    return matchesSearch && matchesTab && matchesProject;
   });
+
+  // Statistics Data
+  const statsLeads = selectedProjectId ? leads.filter(l => l.projectId === selectedProjectId) : leads;
+  
+  const statusData = statuses.filter(s => s !== 'Tất cả').map(status => ({
+    name: status,
+    value: statsLeads.filter(l => l.status === status).length
+  }));
+
+  const resultData = resultOptions.map(result => ({
+    name: result,
+    value: statsLeads.filter(l => l.resultStatus === result).length
+  }));
+
+  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const handleCreate = async () => {
     if (!newLead.customerName || !newLead.phone) return;
@@ -166,25 +187,167 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
         </div>
       </div>
 
-      <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-        <div className="flex space-x-1 md:space-x-2 border-b border-slate-200 min-w-max">
-          {statuses.map(status => (
+      {selectedProjectId && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <FolderKanban className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Dự án đang xem</p>
+              <h3 className="text-base md:text-lg font-bold text-slate-900">{projects.find(p => p.id === selectedProjectId)?.name}</h3>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
-              key={status}
-              onClick={() => setCurrentTab(status)}
-              className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
-                currentTab === status
-                  ? 'border-emerald-600 text-emerald-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              onClick={() => setShowStats(!showStats)}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                showStats 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
               }`}
             >
-              {status}
+              {showStats ? 'Xem danh sách' : 'Xem thống kê'}
             </button>
-          ))}
-        </div>
-      </div>
+            <button 
+              onClick={() => setSelectedProjectId('')}
+              className="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+            >
+              Xem tất cả
+            </button>
+          </div>
+        </motion.div>
+      )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      {!selectedProjectId && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+            <FolderKanban className="w-4 h-4 text-emerald-600" />
+            <select 
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer min-w-[150px]"
+            >
+              <option value="">Tất cả dự án</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+              showStats 
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {showStats ? 'Xem danh sách' : 'Xem thống kê'}
+          </button>
+        </div>
+      )}
+
+      {showStats ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-900 mb-6">Thống kê theo Trạng thái</h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={statusData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    cursor={{ fill: '#f8fafc' }}
+                  />
+                  <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-900 mb-6">Thống kê theo Kết quả</h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={resultData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {resultData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Tổng quan dự án</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-slate-50 rounded-xl">
+                <p className="text-xs text-slate-500 mb-1">Tổng khách hàng</p>
+                <p className="text-2xl font-bold text-slate-900">{statsLeads.length}</p>
+              </div>
+              <div className="p-4 bg-emerald-50 rounded-xl">
+                <p className="text-xs text-emerald-600 mb-1">Đã liên hệ</p>
+                <p className="text-2xl font-bold text-emerald-700">
+                  {statsLeads.filter(l => l.status === 'Đã liên hệ').length}
+                </p>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-xl">
+                <p className="text-xs text-blue-600 mb-1">Đã booking/cọc</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {statsLeads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length}
+                </p>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-xl">
+                <p className="text-xs text-amber-600 mb-1">Đang tư vấn</p>
+                <p className="text-2xl font-bold text-amber-700">
+                  {statsLeads.filter(l => l.subStatus === 'Đang tư vấn').length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+            <div className="flex space-x-1 md:space-x-2 border-b border-slate-200 min-w-max">
+              {statuses.map(status => (
+                <button
+                  key={status}
+                  onClick={() => setCurrentTab(status)}
+                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
+                    currentTab === status
+                      ? 'border-emerald-600 text-emerald-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <AnimatePresence mode="popLayout">
           {filteredLeads.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 md:py-20 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
@@ -304,6 +467,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff }) =
           )}
         </AnimatePresence>
       </div>
+    </>
+  )}
 
       {/* Add Lead Modal */}
       {showAddModal && (

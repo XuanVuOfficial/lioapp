@@ -6,9 +6,10 @@ import { Plus, Trash2, FolderKanban } from 'lucide-react';
 
 interface ProjectListProps {
   user: UserProfile;
+  onProjectClick?: (projectId: string) => void;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ user }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ user, onProjectClick }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -138,7 +139,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user }) => {
         {projects.map((project) => (
           <div
             key={project.id}
-            className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group"
+            onClick={() => onProjectClick?.(project.id)}
+            className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group cursor-pointer hover:border-emerald-200"
           >
             <div className="flex justify-between items-start">
               <div>
