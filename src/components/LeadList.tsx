@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead } from '../services/leadService';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
@@ -24,7 +24,15 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
   const [showStats, setShowStats] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    const saved = localStorage.getItem('leadViewMode');
+    return (saved as 'grid' | 'list') || 'grid';
+  });
   const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem('leadViewMode', viewMode);
+  }, [viewMode]);
   const [newNote, setNewNote] = useState('');
   const [newLead, setNewLead] = useState<Partial<Lead>>({
     customerName: '',
@@ -197,70 +205,77 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         </div>
       </div>
 
-      {selectedProjectId && (
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-              <FolderKanban className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Dự án đang xem</p>
-              <h3 className="text-base md:text-lg font-bold text-slate-900">{projects.find(p => p.id === selectedProjectId)?.name}</h3>
-            </div>
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${selectedProjectId ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+            <FolderKanban className={`w-5 h-5 ${selectedProjectId ? 'text-emerald-600' : 'text-slate-600'}`} />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div>
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${selectedProjectId ? 'text-emerald-600' : 'text-slate-500'}`}>
+              {selectedProjectId ? 'Dự án đang xem' : 'Tất cả dự án'}
+            </p>
+            <h3 className="text-base md:text-lg font-bold text-slate-900">
+              {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name : 'Hệ thống khách hàng'}
+            </h3>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl mr-2">
             <button
-              onClick={() => setShowStats(!showStats)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-                showStats 
-                  ? 'bg-emerald-600 text-white' 
-                  : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
-              }`}
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Dạng lưới"
             >
-              {showStats ? 'Xem danh sách' : 'Xem thống kê'}
+              <LayoutGrid className="w-4 h-4" />
             </button>
-            <button 
-              onClick={() => setSelectedProjectId('')}
-              className="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Dạng danh sách"
             >
-              Xem tất cả
+              <List className="w-4 h-4" />
             </button>
           </div>
-        </motion.div>
-      )}
 
-      {!selectedProjectId && (
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-            <FolderKanban className="w-4 h-4 text-emerald-600" />
-            <select 
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer min-w-[150px]"
-            >
-              <option value="">Tất cả dự án</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-          
           <button
             onClick={() => setShowStats(!showStats)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
               showStats 
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                ? 'bg-emerald-600 text-white' 
+                : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
             }`}
           >
             {showStats ? 'Xem danh sách' : 'Xem thống kê'}
           </button>
+          
+          {selectedProjectId ? (
+            <button 
+              onClick={() => setSelectedProjectId('')}
+              className="flex-1 lg:flex-none px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+            >
+              Xem tất cả
+            </button>
+          ) : (
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+              <select 
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer min-w-[120px]"
+              >
+                <option value="">Chọn dự án...</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-      )}
+      </motion.div>
 
       {showStats ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -357,7 +372,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6" : "space-y-3"}>
         <AnimatePresence mode="popLayout">
           {filteredLeads.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 md:py-20 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
@@ -372,47 +387,33 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 key={lead.id}
-                className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 shadow-sm hover:shadow-md transition-all group"
+                className={`bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all group ${viewMode === 'grid' ? 'p-4 md:p-6' : 'p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4'}`}
               >
-                <div className="flex justify-between items-start mb-3 md:mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                      <User className="w-4 h-4 md:w-5 md:h-5 text-slate-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight">{lead.customerName}</h3>
-                      <p className="text-[10px] md:text-xs text-slate-500">
-                        {lead.customerCode ? `Mã KH: ${lead.customerCode}` : `ID: ${lead.id.slice(0, 8)}`}
-                      </p>
-                    </div>
+                <div className={`flex items-start gap-3 ${viewMode === 'list' ? 'md:w-1/4' : 'mb-3 md:mb-4'}`}>
+                  <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4 md:w-5 md:h-5 text-slate-600" />
                   </div>
-                  <div className="flex gap-1">
-                    {(user.role === 'admin' || user.role === 'manager') && (
-                      <button 
-                        onClick={() => setShowAssignModal(lead)}
-                        className="p-1.5 md:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Giao khách hàng"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button className="p-1.5 md:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight truncate">{lead.customerName}</h3>
+                    <p className="text-[10px] md:text-xs text-slate-500">
+                      {lead.customerCode ? `Mã KH: ${lead.customerCode}` : `ID: ${lead.id.slice(0, 8)}`}
+                    </p>
                   </div>
                 </div>
 
-                <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
-                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                    <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    {lead.phone}
-                  </div>
-                  {lead.email && (
+                <div className={`${viewMode === 'grid' ? 'space-y-2 md:space-y-3 mb-4 md:mb-6' : 'flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4'}`}>
+                  <div className="flex items-center justify-between group/phone">
                     <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                      <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                      <span className="truncate">{lead.email}</span>
+                      <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
+                      {lead.phone}
                     </div>
-                  )}
+                    <div className="flex gap-1 opacity-0 group-hover/phone:opacity-100 transition-opacity">
+                      <a href={`tel:${lead.phone}`} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Gọi"><PhoneCall className="w-3.5 h-3.5" /></a>
+                      <a href={`https://zalo.me/${lead.phone}`} target="_blank" rel="noreferrer" className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Zalo"><MessageSquare className="w-3.5 h-3.5" /></a>
+                      <a href={`sms:${lead.phone}`} className="p-1 text-slate-600 hover:bg-slate-50 rounded" title="SMS"><MessageCircle className="w-3.5 h-3.5" /></a>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Tag className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
                     <div className="flex flex-wrap gap-1">
@@ -430,23 +431,35 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                       )}
                     </div>
                   </div>
+
+                  {viewMode === 'grid' && lead.email && (
+                    <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
+                      <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
+                      <span className="truncate">{lead.email}</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Briefcase className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
                     <span className="truncate">{departments.find(d => d.id === lead.departmentId)?.name || 'Chưa có phòng ban'}</span>
                   </div>
+
                   {lead.projectId && (
                     <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                       <FolderKanban className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
                       <span className="truncate">{projects.find(p => p.id === lead.projectId)?.name || 'Dự án không tồn tại'}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                    <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    {new Date(lead.updatedAt).toLocaleDateString()}
-                  </div>
+
+                  {viewMode === 'list' && (
+                    <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
+                      <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
+                      {new Date(lead.updatedAt).toLocaleDateString()}
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex items-center justify-between pt-3 md:pt-4 border-t border-slate-100">
+                <div className={`flex items-center justify-between ${viewMode === 'grid' ? 'pt-3 md:pt-4 border-t border-slate-100' : 'md:w-1/4 md:justify-end gap-4'}`}>
                   <div className="flex flex-col gap-1">
                     <div className="flex -space-x-2">
                       <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[8px] md:text-[10px] font-bold" title={`Tạo bởi: ${lead.creatorEmail}`}>
@@ -458,19 +471,29 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         </div>
                       )}
                     </div>
-                    <p className="text-[9px] md:text-[10px] text-slate-400 font-medium">
-                      {lead.creatorEmail === user.email ? 'Tôi tạo' : `Từ: ${lead.creatorEmail.split('@')[0]}`}
-                      {lead.assignedToEmail && lead.assignedToEmail !== lead.creatorEmail && (
-                        <> • {lead.assignedToEmail === user.email ? 'Giao cho tôi' : `Giao: ${lead.assignedToEmail.split('@')[0]}`}</>
-                      )}
-                    </p>
                   </div>
-                  <button 
-                    onClick={() => setSelectedLead(lead)}
-                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-                  >
-                    Xem chi tiết
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setSelectedLead(lead)}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 px-2 py-1 hover:bg-emerald-50 rounded-lg transition-all"
+                    >
+                      Chi tiết
+                    </button>
+                    <div className="flex gap-1">
+                      {(user.role === 'admin' || user.role === 'manager') && (
+                        <button 
+                          onClick={() => setShowAssignModal(lead)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Giao khách hàng"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             ))
@@ -755,9 +778,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Thông tin liên hệ</h4>
                   <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-slate-50 p-4 rounded-xl">
-                      <p className="text-xs text-slate-500 mb-1">Điện thoại</p>
-                      <p className="font-semibold text-slate-900">{selectedLead.phone}</p>
+                    <div className="bg-slate-50 p-4 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Điện thoại</p>
+                        <p className="font-semibold text-slate-900">{selectedLead.phone}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <a href={`tel:${selectedLead.phone}`} className="w-10 h-10 flex items-center justify-center bg-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-200 transition-all" title="Gọi"><PhoneCall className="w-5 h-5" /></a>
+                        <a href={`https://zalo.me/${selectedLead.phone}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-all" title="Zalo"><MessageSquare className="w-5 h-5" /></a>
+                        <a href={`sms:${selectedLead.phone}`} className="w-10 h-10 flex items-center justify-center bg-slate-200 text-slate-600 rounded-xl hover:bg-slate-300 transition-all" title="SMS"><MessageCircle className="w-5 h-5" /></a>
+                      </div>
                     </div>
                     <div className="bg-slate-50 p-4 rounded-xl">
                       <p className="text-xs text-slate-500 mb-1">Email</p>

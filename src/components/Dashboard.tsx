@@ -12,12 +12,14 @@ interface Props {
 export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
   const stats = [
     { label: 'Tổng số khách hàng', value: leads.length, icon: UserPlus, color: 'bg-blue-50 text-blue-600' },
-    { label: 'Khách hàng đang xử lý', value: leads.filter(l => l.status !== 'Đã Chốt' && l.status !== 'Chưa Liên Hệ').length, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Khách hàng đã chốt', value: leads.filter(l => l.status === 'Đã Chốt').length, icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
-    { label: 'Khách hàng mới', value: leads.filter(l => l.status === 'Chưa Liên Hệ').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
+    { label: 'Đã liên hệ', value: leads.filter(l => l.status === 'Đã liên hệ').length, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Đã booking/cọc', value: leads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length, icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
+    { label: 'Chưa liên hệ', value: leads.filter(l => l.status === 'Chưa liên hệ').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
   ];
 
-  const recentLeads = leads.slice(0, 5);
+  const recentLeads = [...leads]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
 
   return (
     <div className="space-y-8">
