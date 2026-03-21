@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3 } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead } from '../services/leadService';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
@@ -219,7 +219,12 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               {selectedProjectId ? 'Dự án đang xem' : 'Tất cả dự án'}
             </p>
             <h3 className="text-base md:text-lg font-bold text-slate-900">
-              {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name : 'Hệ thống khách hàng'}
+              {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name : (
+                <>
+                  <span className="sm:hidden">Khách hàng</span>
+                  <span className="hidden sm:inline">Hệ thống khách hàng</span>
+                </>
+              )}
             </h3>
           </div>
         </div>
@@ -244,21 +249,32 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
           <button
             onClick={() => setShowStats(!showStats)}
-            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm ${
               showStats 
                 ? 'bg-emerald-600 text-white' 
                 : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
             }`}
           >
-            {showStats ? 'Xem danh sách' : 'Xem thống kê'}
+            {showStats ? (
+              <>
+                <List className="w-4 h-4" />
+                <span>Danh sách</span>
+              </>
+            ) : (
+              <>
+                <BarChart3 className="w-4 h-4" />
+                <span>Thống kê</span>
+              </>
+            )}
           </button>
           
           {selectedProjectId ? (
             <button 
               onClick={() => setSelectedProjectId('')}
-              className="flex-1 lg:flex-none px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+              className="flex-1 lg:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
             >
-              Xem tất cả
+              <span className="sm:hidden">Tất cả</span>
+              <span className="hidden sm:inline">Xem tất cả</span>
             </button>
           ) : (
             <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
@@ -267,7 +283,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 onChange={(e) => setSelectedProjectId(e.target.value)}
                 className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer min-w-[120px]"
               >
-                <option value="">Chọn dự án...</option>
+                <option value="" className="sm:hidden">Dự án...</option>
+                <option value="" className="hidden sm:inline">Chọn dự án...</option>
                 {projects.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -387,7 +404,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 key={lead.id}
-                className={`bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all group ${viewMode === 'grid' ? 'p-4 md:p-6' : 'p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4'}`}
+                onClick={() => setSelectedLead(lead)}
+                className={`bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all group cursor-pointer ${viewMode === 'grid' ? 'p-4 md:p-6' : 'p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4'}`}
               >
                 <div className={`flex items-start gap-3 ${viewMode === 'list' ? 'md:w-1/4' : 'mb-3 md:mb-4'}`}>
                   <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
@@ -408,9 +426,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                       {lead.phone}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover/phone:opacity-100 transition-opacity">
-                      <a href={`tel:${lead.phone}`} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Gọi"><PhoneCall className="w-3.5 h-3.5" /></a>
-                      <a href={`https://zalo.me/${lead.phone}`} target="_blank" rel="noreferrer" className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Zalo"><MessageSquare className="w-3.5 h-3.5" /></a>
-                      <a href={`sms:${lead.phone}`} className="p-1 text-slate-600 hover:bg-slate-50 rounded" title="SMS"><MessageCircle className="w-3.5 h-3.5" /></a>
+                      <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Gọi"><PhoneCall className="w-3.5 h-3.5" /></a>
+                      <a href={`https://zalo.me/${lead.phone}`} onClick={e => e.stopPropagation()} target="_blank" rel="noreferrer" className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Zalo"><MessageSquare className="w-3.5 h-3.5" /></a>
+                      <a href={`sms:${lead.phone}`} onClick={e => e.stopPropagation()} className="p-1 text-slate-600 hover:bg-slate-50 rounded" title="SMS"><MessageCircle className="w-3.5 h-3.5" /></a>
                     </div>
                   </div>
 
@@ -432,12 +450,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     </div>
                   </div>
 
-                  {viewMode === 'grid' && lead.email && (
-                    <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                      <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                      <span className="truncate">{lead.email}</span>
-                    </div>
-                  )}
+
 
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Briefcase className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
@@ -473,23 +486,20 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => setSelectedLead(lead)}
-                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 px-2 py-1 hover:bg-emerald-50 rounded-lg transition-all"
-                    >
-                      Chi tiết
-                    </button>
                     <div className="flex gap-1">
                       {(user.role === 'admin' || user.role === 'manager') && (
                         <button 
-                          onClick={() => setShowAssignModal(lead)}
+                          onClick={(e) => { e.stopPropagation(); setShowAssignModal(lead); }}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                           title="Giao khách hàng"
                         >
                           <UserPlus className="w-4 h-4" />
                         </button>
                       )}
-                      <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                      <button 
+                        onClick={e => e.stopPropagation()}
+                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                      >
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
@@ -777,21 +787,41 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <div className="md:col-span-2 space-y-8">
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Thông tin liên hệ</h4>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-slate-50 p-4 rounded-xl flex items-center justify-between">
+                  <div className="bg-slate-50 p-5 rounded-2xl space-y-5 mb-6">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Điện thoại</p>
-                        <p className="font-semibold text-slate-900">{selectedLead.phone}</p>
+                        <p className="text-xs text-slate-500 mb-1">Số điện thoại</p>
+                        <p className="text-xl font-bold text-slate-900 tracking-tight">{selectedLead.phone}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <a href={`tel:${selectedLead.phone}`} className="w-10 h-10 flex items-center justify-center bg-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-200 transition-all" title="Gọi"><PhoneCall className="w-5 h-5" /></a>
-                        <a href={`https://zalo.me/${selectedLead.phone}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-all" title="Zalo"><MessageSquare className="w-5 h-5" /></a>
-                        <a href={`sms:${selectedLead.phone}`} className="w-10 h-10 flex items-center justify-center bg-slate-200 text-slate-600 rounded-xl hover:bg-slate-300 transition-all" title="SMS"><MessageCircle className="w-5 h-5" /></a>
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center">
+                        <Phone className="w-6 h-6 text-emerald-600" />
                       </div>
                     </div>
-                    <div className="bg-slate-50 p-4 rounded-xl">
-                      <p className="text-xs text-slate-500 mb-1">Email</p>
-                      <p className="font-semibold text-slate-900">{selectedLead.email || 'N/A'}</p>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <a 
+                        href={`tel:${selectedLead.phone}`} 
+                        className="flex flex-col items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
+                      >
+                        <PhoneCall className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase">Gọi điện</span>
+                      </a>
+                      <a 
+                        href={`https://zalo.me/${selectedLead.phone}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="flex flex-col items-center justify-center gap-2 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-100"
+                      >
+                        <MessageSquare className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase">Zalo</span>
+                      </a>
+                      <a 
+                        href={`sms:${selectedLead.phone}`} 
+                        className="flex flex-col items-center justify-center gap-2 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all shadow-md shadow-slate-200"
+                      >
+                        <MessageCircle className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase">SMS</span>
+                      </a>
                     </div>
                   </div>
                   {selectedLead.notes && (
