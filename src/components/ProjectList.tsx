@@ -81,7 +81,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
           <FolderKanban className="w-6 h-6 text-emerald-600" />
           Quản lý Dự án
         </h2>
-        {(user.role === 'admin' || user.role === 'manager') && (
+        {(user.role === 'admin' || user.role === 'tp') && (
           <button
             onClick={() => setIsAdding(!isAdding)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
@@ -157,7 +157,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
                     </span>
                   </div>
                 </div>
-                {(user.role === 'admin' || user.role === 'manager') && (
+                {(user.role === 'admin' || user.role === 'tp') && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

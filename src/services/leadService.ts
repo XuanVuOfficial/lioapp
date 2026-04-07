@@ -1,6 +1,6 @@
 import { doc, setDoc, updateDoc, deleteDoc, collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError } from '../firebase';
-import { Lead, OperationType } from '../types';
+import { Lead, OperationType, UserRole } from '../types';
 
 const COLLECTION = 'leads';
 
@@ -91,22 +91,25 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   }
 };
 
-export const subscribeToLeads = (role: string, email: string, departmentId: string | undefined, callback: (leads: Lead[]) => void) => {
+export const subscribeToLeads = (role: UserRole, email: string, departmentIds: string[] | undefined, callback: (leads: Lead[]) => void) => {
   let q = query(collection(db, COLLECTION), orderBy('updatedAt', 'desc'));
 
-  if (role === 'manager' && departmentId) {
-    // Managers see leads in their department
-    q = query(collection(db, COLLECTION), where('departmentId', '==', departmentId), orderBy('updatedAt', 'desc'));
+  if (role === 'tp' && departmentIds && departmentIds.length > 0) {
+    if (departmentIds.length <= 10) {
+      q = query(collection(db, COLLECTION), where('departmentId', 'in', departmentIds), orderBy('updatedAt', 'desc'));
+    }
   } else if (role === 'staff') {
-    // Staff see leads assigned to them OR created by them
-    // Firestore doesn't support OR in simple queries easily without multiple queries or 'in' operator
-    // But we can filter by assignedToEmail and handle the 'created by' part in the rules/logic
-    // For now, let's stick to assignedToEmail as the primary filter for staff
     q = query(collection(db, COLLECTION), where('assignedToEmail', '==', email), orderBy('updatedAt', 'desc'));
   }
 
   return onSnapshot(q, (snapshot) => {
-    const leads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Lead);
+    let leads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Lead);
+    
+    // Client-side filtering for cases where we have more than 10 departments or other complex logic
+    if (role === 'tp' && departmentIds && departmentIds.length > 10) {
+      leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
+    }
+    
     callback(leads);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, COLLECTION);

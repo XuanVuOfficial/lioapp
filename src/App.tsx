@@ -10,11 +10,22 @@ import { DepartmentHierarchy } from './components/DepartmentHierarchy';
 import { LeadList } from './components/LeadList';
 import { StaffList } from './components/StaffList';
 import { ProjectList } from './components/ProjectList';
+import { Settings } from './components/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
+import { AppSettings, subscribeToSettings } from './services/settingsService';
 
 const ADMIN_EMAIL = 'admin@salespro.com';
+
+const getSubDepartmentIds = (deptId: string, allDepts: Department[]): string[] => {
+  const ids = [deptId];
+  const children = allDepts.filter(d => d.parentId === deptId);
+  children.forEach(child => {
+    ids.push(...getSubDepartmentIds(child.id, allDepts));
+  });
+  return ids;
+};
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -24,6 +35,7 @@ export default function App() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [staff, setStaff] = useState<UserProfile[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -31,6 +43,10 @@ export default function App() {
       if (storedUid) {
         const profile = await getUserProfile(storedUid);
         if (profile) {
+          // Force admin role for admin email
+          if (profile.email === ADMIN_EMAIL) {
+            profile.role = 'admin';
+          }
           setUser(profile);
         } else {
           localStorage.removeItem('salespro_uid');
@@ -51,21 +67,43 @@ export default function App() {
     if (!user) return;
 
     const unsubDepts = subscribeToDepartments(setDepartments);
-    const unsubLeads = subscribeToLeads(user.role, user.email, user.departmentId, setLeads);
+    const unsubSettings = subscribeToSettings(setSettings);
+
+    return () => {
+      unsubDepts();
+      unsubSettings();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const allowedDeptIds = user.role === 'tp' && user.departmentId
+      ? getSubDepartmentIds(user.departmentId, departments)
+      : (user.departmentId ? [user.departmentId] : undefined);
+
+    const unsubLeads = subscribeToLeads(user.role, user.email, allowedDeptIds, setLeads);
 
     let unsubStaff: () => void = () => {};
-    if (user.role === 'manager' && user.departmentId) {
-      unsubStaff = subscribeToUsersByDepartment(user.departmentId, setStaff);
-    } else if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'tp') {
       unsubStaff = subscribeToAllUsers(setStaff);
     }
 
     return () => {
-      unsubDepts();
       unsubLeads();
       unsubStaff();
     };
-  }, [user]);
+  }, [user, departments]);
+
+  const filteredStaff = React.useMemo(() => {
+    if (!user) return [];
+    if (user.role === 'admin') return staff;
+    if (user.role === 'tp' && user.departmentId) {
+      const allowedDeptIds = getSubDepartmentIds(user.departmentId, departments);
+      return staff.filter(s => s.departmentId && allowedDeptIds.includes(s.departmentId));
+    }
+    return staff.filter(s => s.uid === user.uid);
+  }, [staff, user, departments]);
 
   if (loading) {
     return (
@@ -84,9 +122,9 @@ export default function App() {
       case 'dashboard':
         return <Dashboard leads={leads} departments={departments} user={user} />;
       case 'departments':
-        return <DepartmentHierarchy departments={departments} user={user} allUsers={staff} />;
+        return <DepartmentHierarchy departments={departments} user={user} allUsers={filteredStaff} />;
       case 'leads':
-        return <LeadList leads={leads} departments={departments} user={user} staff={staff} initialProjectId={selectedProjectId || undefined} />;
+        return <LeadList leads={leads} departments={departments} user={user} staff={filteredStaff} initialProjectId={selectedProjectId || undefined} />;
       case 'projects':
         return (
           <ProjectList 
@@ -99,7 +137,9 @@ export default function App() {
           />
         );
       case 'staff':
-        return <StaffList users={staff} departments={departments} currentUser={user} />;
+        return <StaffList users={filteredStaff} departments={departments} currentUser={user} />;
+      case 'settings':
+        return <Settings user={user} />;
       default:
         return <Dashboard leads={leads} departments={departments} user={user} />;
     }
@@ -107,7 +147,13 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <Layout user={user} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout}>
+      <Layout 
+        user={user} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onLogout={handleLogout}
+        settings={settings}
+      >
         {renderContent()}
       </Layout>
       <PWAInstallPrompt />

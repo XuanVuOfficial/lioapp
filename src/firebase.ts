@@ -4,7 +4,18 @@ import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+
+// Try to use the named database if provided, otherwise fallback to default
+let firestoreDb;
+try {
+  const dbId = (firebaseConfig as any).firestoreDatabaseId;
+  firestoreDb = getFirestore(app, dbId && dbId !== '(default)' ? dbId : '(default)');
+} catch (e) {
+  console.warn('Failed to initialize named Firestore database, falling back to (default)', e);
+  firestoreDb = getFirestore(app);
+}
+
+export const db = firestoreDb;
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {

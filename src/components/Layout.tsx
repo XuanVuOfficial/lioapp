@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon } from 'lucide-react';
 import { UserProfile } from '../types';
+import { AppSettings } from '../services/settingsService';
 
 interface LayoutProps {
   user: UserProfile | null;
@@ -9,20 +10,26 @@ interface LayoutProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onLogout: () => void;
+  settings: AppSettings | null;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setActiveTab, onLogout }) => {
+export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setActiveTab, onLogout, settings }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const navItems = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, roles: ['admin', 'manager', 'staff'] },
-    { id: 'leads', label: 'Khách hàng', icon: UserPlus, roles: ['admin', 'manager', 'staff'] },
-    { id: 'projects', label: 'Dự án', icon: Briefcase, roles: ['admin', 'manager'] },
-    { id: 'departments', label: 'Phòng ban', icon: Users, roles: ['admin', 'manager'] },
-    { id: 'staff', label: 'Nhân viên', icon: UserCircle, roles: ['admin', 'manager'] },
+    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+    { id: 'leads', label: 'Khách hàng', icon: UserPlus },
+    { id: 'projects', label: 'Dự án', icon: Briefcase },
+    { id: 'departments', label: 'Phòng ban', icon: Users },
+    { id: 'staff', label: 'Nhân viên', icon: UserCircle },
+    { id: 'settings', label: 'Cài đặt', icon: SettingsIcon },
   ];
 
-  const filteredNavItems = navItems.filter(item => user && item.roles.includes(user.role));
+  const filteredNavItems = React.useMemo(() => {
+    if (!user || !settings) return [];
+    const allowedTabs = settings.tabVisibility[user.role] || [];
+    return navItems.filter(item => allowedTabs.includes(item.id));
+  }, [user, settings]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -82,7 +89,8 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 truncate">{user?.displayName}</p>
                 <p className="text-xs text-slate-500 truncate capitalize">
-                  {user?.role === 'admin' ? 'Quản trị viên' : user?.role === 'manager' ? 'Trưởng phòng' : 'Nhân viên'}
+                  {user?.role === 'admin' ? 'Admin' : 
+                   user?.role === 'tp' ? 'Trưởng phòng' : 'Nhân viên'}
                 </p>
               </div>
             </div>

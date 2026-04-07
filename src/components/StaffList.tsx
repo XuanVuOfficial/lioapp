@@ -62,12 +62,53 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     return departments.find(d => d.id === id)?.name || 'Chưa phân phối';
   };
 
+  const getDetailedRole = (user: UserProfile) => {
+    const deptName = getDeptName(user.departmentId);
+    const roleName = user.role === 'admin' ? 'Admin' : 
+                    user.role === 'tp' ? 'Trưởng phòng' : 'Nhân viên';
+    
+    if (user.role === 'admin') return roleName;
+    return `${roleName} ${deptName}`;
+  };
+
+  const canEdit = (targetUser: UserProfile) => {
+    if (currentUser.role === 'admin') {
+      // Admin cannot edit other Admins
+      return targetUser.role !== 'admin';
+    }
+    // TP can edit staff in their department
+    return targetUser.role === 'staff';
+  };
+
+  const canDelete = (targetUser: UserProfile) => {
+    if (targetUser.uid === currentUser.uid) return false;
+    if (currentUser.role === 'admin') {
+      return targetUser.role !== 'admin';
+    }
+    // Managers can delete staff in their department
+    if (currentUser.role === 'tp' && currentUser.departmentId) {
+      return targetUser.departmentId === currentUser.departmentId && targetUser.role === 'staff';
+    }
+    return false;
+  };
+
+  const handleShowAddModal = () => {
+    setNewUser({
+      email: '',
+      displayName: '',
+      password: '',
+      role: 'staff' as UserRole,
+      departmentId: currentUser.role === 'tp' ? (currentUser.departmentId || '') : ''
+    });
+    setShowAddModal(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-900">Danh sách nhân viên</h2>
         <button 
-          onClick={() => setShowAddModal(true)}
+          onClick={handleShowAddModal}
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-lg shadow-emerald-100"
         >
           <UserPlus className="w-4 h-4" />
@@ -94,8 +135,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-semibold">Nhân viên</th>
-                <th className="px-6 py-4 font-semibold">Phòng ban</th>
-                <th className="px-6 py-4 font-semibold">Vai trò</th>
+                <th className="px-6 py-4 font-semibold">Vai trò đang tham gia</th>
                 <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
               </tr>
             </thead>
@@ -114,30 +154,26 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">
-                      <Briefcase className="w-3 h-3" />
-                      {getDeptName(user.departmentId)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
                       user.role === 'admin' ? 'bg-purple-50 text-purple-700' :
-                      user.role === 'manager' ? 'bg-amber-50 text-amber-700' :
+                      user.role === 'tp' ? 'bg-amber-50 text-amber-700' :
                       'bg-slate-100 text-slate-700'
                     }`}>
                       <Shield className="w-3 h-3" />
-                      {user.role === 'admin' ? 'Admin' : user.role === 'manager' ? 'Quản lý' : 'Nhân viên'}
+                      {getDetailedRole(user)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button 
-                        onClick={() => setEditingUser(user)}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {user.uid !== currentUser.uid && (
+                      {canEdit(user) && (
+                        <button 
+                          onClick={() => setEditingUser(user)}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canDelete(user) && (
                         <button 
                           onClick={() => deleteUser(user.uid)}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -168,13 +204,15 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button 
-                    onClick={() => setEditingUser(user)}
-                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  {user.uid !== currentUser.uid && (
+                  {canEdit(user) && (
+                    <button 
+                      onClick={() => setEditingUser(user)}
+                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  {canDelete(user) && (
                     <button 
                       onClick={() => deleteUser(user.uid)}
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -185,17 +223,13 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-medium">
-                  <Briefcase className="w-3 h-3" />
-                  {getDeptName(user.departmentId)}
-                </span>
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium ${
                   user.role === 'admin' ? 'bg-purple-50 text-purple-700' :
-                  user.role === 'manager' ? 'bg-amber-50 text-amber-700' :
+                  user.role === 'tp' ? 'bg-amber-50 text-amber-700' :
                   'bg-slate-100 text-slate-700'
                 }`}>
                   <Shield className="w-3 h-3" />
-                  {user.role === 'admin' ? 'Admin' : user.role === 'manager' ? 'Quản lý' : 'Nhân viên'}
+                  {getDetailedRole(user)}
                 </span>
               </div>
             </div>
@@ -255,29 +289,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Vai trò</label>
-                  <select 
-                    value={newUser.role}
-                    onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  >
-                    <option value="staff">Nhân viên</option>
-                    <option value="manager">Quản lý</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Phòng ban</label>
-                  <select 
-                    value={newUser.departmentId}
-                    onChange={e => setNewUser(prev => ({ ...prev, departmentId: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  >
-                    <option value="">Chưa phân phối</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  <p className="text-sm font-medium text-slate-500">Phòng ban</p>
+                  <p className="font-semibold text-slate-900">{getDeptName(newUser.departmentId)}</p>
                 </div>
               </div>
 
@@ -328,29 +341,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   <p className="text-xs text-slate-500">{editingUser.email}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Vai trò</label>
-                  <select 
-                    value={editingUser.role}
-                    onChange={e => setEditingUser(prev => prev ? ({ ...prev, role: e.target.value as UserRole }) : null)}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  >
-                    <option value="staff">Nhân viên</option>
-                    <option value="manager">Quản lý</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Phòng ban</label>
-                  <select 
-                    value={editingUser.departmentId || ''}
-                    onChange={e => setEditingUser(prev => prev ? ({ ...prev, departmentId: e.target.value || undefined }) : null)}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  >
-                    <option value="">Chưa phân phối</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  <p className="text-sm font-medium text-slate-500">Phòng ban</p>
+                  <p className="font-semibold text-slate-900">{getDeptName(editingUser.departmentId)}</p>
                 </div>
               </div>
 

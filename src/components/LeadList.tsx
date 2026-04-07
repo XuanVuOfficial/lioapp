@@ -487,7 +487,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      {(user.role === 'admin' || user.role === 'manager') && (
+                      {(user.role === 'admin' || user.role === 'tp') && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); setShowAssignModal(lead); }}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -720,10 +720,32 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <div>
                 <label className="block text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Giao cho nhân viên</label>
                 <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+                  {/* Option to assign to self if manager */}
+                  {user.role === 'tp' && (
+                    <button
+                      onClick={() => handleAssign(showAssignModal, user.email, user.departmentId)}
+                      className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
+                        showAssignModal.assignedToEmail === user.email 
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-blue-100 hover:border-blue-200 hover:bg-blue-50'
+                      }`}
+                    >
+                      <div>
+                        <p className="font-semibold text-blue-900">Giao cho bản thân (Trưởng phòng)</p>
+                        <p className="text-xs text-blue-500">{user.displayName} ({user.email})</p>
+                      </div>
+                      {showAssignModal.assignedToEmail === user.email ? (
+                        <Check className="w-4 h-4 text-blue-600" />
+                      ) : (
+                        <User className="w-4 h-4 text-blue-600" />
+                      )}
+                    </button>
+                  )}
+
                   {staff.length === 0 ? (
-                    <p className="text-sm text-slate-500 italic">Không tìm thấy nhân viên nào trong phòng ban này.</p>
+                    <p className="text-sm text-slate-500 italic mt-2">Không tìm thấy nhân viên nào khác trong phòng ban này.</p>
                   ) : (
-                    staff.map(s => {
+                    staff.filter(s => s.email !== user.email).map(s => {
                       const isSelected = showAssignModal.assignedToEmail === s.email;
                       return (
                         <button

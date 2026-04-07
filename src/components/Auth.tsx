@@ -35,6 +35,10 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
       }
 
       if (profile) {
+        // Force admin role for admin email
+        if (profile.email === 'admin@salespro.com') {
+          profile.role = 'admin';
+        }
         localStorage.setItem('salespro_uid', profile.uid);
         onLogin(profile);
       } else {

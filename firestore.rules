@@ -1,7 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow all access for now to fix permission errors
     match /{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Explicitly match collections to ensure they are covered
+    match /leads/{leadId} {
+      allow read, write: if true;
+    }
+    match /departments/{deptId} {
+      allow read, write: if true;
+    }
+    match /projects/{projectId} {
+      allow read, write: if true;
+    }
+    match /users/{userId} {
       allow read, write: if true;
     }
   }

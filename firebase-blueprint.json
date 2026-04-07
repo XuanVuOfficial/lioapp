@@ -65,7 +65,7 @@
         "email": { "type": "string", "format": "email", "description": "User's email address." },
         "password": { "type": "string", "description": "User's password (plaintext for this demo)." },
         "displayName": { "type": "string", "description": "User's display name." },
-        "role": { "type": "string", "enum": ["admin", "manager", "staff"], "description": "User's role in the system." },
+        "role": { "type": "string", "enum": ["tgd", "admin", "gds", "tp", "staff"], "description": "User's role in the system." },
         "departmentId": { "type": "string", "description": "ID of the department the user belongs to." }
       },
       "required": ["uid", "email", "password", "role"]
