@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Department, Lead } from './types';
+import { UserProfile, Department, Lead, UserRole } from './types';
 import { getUserProfile, createUserProfile, subscribeToUsersByDepartment, getUserProfileByEmail, subscribeToAllUsers } from './services/userService';
 import { subscribeToDepartments } from './services/departmentService';
 import { subscribeToLeads } from './services/leadService';
@@ -75,17 +75,38 @@ export default function App() {
     };
   }, [user]);
 
+  const effectiveUser = React.useMemo(() => {
+    if (!user) return null;
+    
+    // Determine if user is a manager of any department
+    const managedDepts = departments.filter(d => d.managerEmail === user.email);
+    const isManager = managedDepts.length > 0;
+    
+    const effectiveRole = user.email === ADMIN_EMAIL ? 'admin' : (isManager ? 'tp' : user.role);
+    
+    // If they are a manager but don't have a departmentId set to one of their managed depts, 
+    // we should prioritize their managed depts for visibility
+    const effectiveDeptId = user.departmentId || (isManager ? managedDepts[0].id : undefined);
+    
+    return {
+      ...user,
+      role: effectiveRole as UserRole,
+      departmentId: effectiveDeptId,
+      managedDeptIds: managedDepts.map(d => d.id)
+    };
+  }, [user, departments]);
+
   useEffect(() => {
-    if (!user) return;
+    if (!effectiveUser) return;
 
-    const allowedDeptIds = user.role === 'tp' && user.departmentId
-      ? getSubDepartmentIds(user.departmentId, departments)
-      : (user.departmentId ? [user.departmentId] : undefined);
+    const allowedDeptIds = effectiveUser.role === 'tp' && effectiveUser.departmentId
+      ? getSubDepartmentIds(effectiveUser.departmentId, departments)
+      : (effectiveUser.departmentId ? [effectiveUser.departmentId] : undefined);
 
-    const unsubLeads = subscribeToLeads(user.role, user.email, allowedDeptIds, setLeads);
+    const unsubLeads = subscribeToLeads(effectiveUser.role, effectiveUser.email, allowedDeptIds, setLeads);
 
     let unsubStaff: () => void = () => {};
-    if (user.role === 'admin' || user.role === 'tp') {
+    if (effectiveUser.role === 'admin' || effectiveUser.role === 'tp') {
       unsubStaff = subscribeToAllUsers(setStaff);
     }
 
@@ -93,17 +114,17 @@ export default function App() {
       unsubLeads();
       unsubStaff();
     };
-  }, [user, departments]);
+  }, [effectiveUser, departments]);
 
   const filteredStaff = React.useMemo(() => {
-    if (!user) return [];
-    if (user.role === 'admin') return staff;
-    if (user.role === 'tp' && user.departmentId) {
-      const allowedDeptIds = getSubDepartmentIds(user.departmentId, departments);
+    if (!effectiveUser) return [];
+    if (effectiveUser.role === 'admin') return staff;
+    if (effectiveUser.role === 'tp' && effectiveUser.departmentId) {
+      const allowedDeptIds = getSubDepartmentIds(effectiveUser.departmentId, departments);
       return staff.filter(s => s.departmentId && allowedDeptIds.includes(s.departmentId));
     }
-    return staff.filter(s => s.uid === user.uid);
-  }, [staff, user, departments]);
+    return staff.filter(s => s.uid === effectiveUser.uid);
+  }, [staff, effectiveUser, departments]);
 
   if (loading) {
     return (
@@ -118,17 +139,18 @@ export default function App() {
   }
 
   const renderContent = () => {
+    if (!effectiveUser) return null;
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard leads={leads} departments={departments} user={user} />;
+        return <Dashboard leads={leads} departments={departments} user={effectiveUser} />;
       case 'departments':
-        return <DepartmentHierarchy departments={departments} user={user} allUsers={filteredStaff} />;
+        return <DepartmentHierarchy departments={departments} user={effectiveUser} allUsers={filteredStaff} />;
       case 'leads':
-        return <LeadList leads={leads} departments={departments} user={user} staff={filteredStaff} initialProjectId={selectedProjectId || undefined} />;
+        return <LeadList leads={leads} departments={departments} user={effectiveUser} staff={filteredStaff} initialProjectId={selectedProjectId || undefined} />;
       case 'projects':
         return (
           <ProjectList 
-            user={user} 
+            user={effectiveUser} 
             leads={leads}
             onProjectClick={(projectId) => {
               setSelectedProjectId(projectId);
@@ -137,18 +159,18 @@ export default function App() {
           />
         );
       case 'staff':
-        return <StaffList users={filteredStaff} departments={departments} currentUser={user} />;
+        return <StaffList users={filteredStaff} departments={departments} currentUser={effectiveUser} />;
       case 'settings':
-        return <Settings user={user} />;
+        return <Settings user={effectiveUser} />;
       default:
-        return <Dashboard leads={leads} departments={departments} user={user} />;
+        return <Dashboard leads={leads} departments={departments} user={effectiveUser} />;
     }
   };
 
   return (
     <ErrorBoundary>
       <Layout 
-        user={user} 
+        user={effectiveUser} 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onLogout={handleLogout}

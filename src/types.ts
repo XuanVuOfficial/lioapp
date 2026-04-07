@@ -7,6 +7,7 @@ export interface UserProfile {
   role: UserRole;
   departmentId?: string;
   password?: string;
+  managedDeptIds?: string[];
 }
 
 export interface Department {

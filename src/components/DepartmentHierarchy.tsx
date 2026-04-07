@@ -151,7 +151,7 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
 
   const rootNodes = isAdmin 
     ? departments.filter(d => !d.parentId)
-    : departments.filter(d => d.id === user.departmentId);
+    : departments.filter(d => user.managedDeptIds?.includes(d.id) || d.id === user.departmentId);
 
   return (
     <div className="space-y-4 md:space-y-6">
