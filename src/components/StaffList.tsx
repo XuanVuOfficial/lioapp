@@ -63,12 +63,23 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   };
 
   const getDetailedRole = (user: UserProfile) => {
-    const deptName = getDeptName(user.departmentId);
-    const roleName = user.role === 'admin' ? 'Admin' : 
-                    user.role === 'tp' ? 'Trưởng phòng' : 'Nhân viên';
+    if (user.role === 'admin') return 'Admin';
+
+    const roles: string[] = [];
     
-    if (user.role === 'admin') return roleName;
-    return `${roleName} ${deptName}`;
+    // Tìm các phòng ban mà user là trưởng phòng (dựa trên email)
+    const managedDepts = departments.filter(d => d.managerEmail === user.email);
+    managedDepts.forEach(d => {
+      roles.push(`Trưởng phòng ${d.name}`);
+    });
+
+    // Tìm phòng ban mà user là nhân viên (nếu chưa được liệt kê là trưởng phòng của phòng đó)
+    const staffDept = departments.find(d => d.id === user.departmentId);
+    if (staffDept && !managedDepts.some(d => d.id === staffDept.id)) {
+      roles.push(`Nhân viên ${staffDept.name}`);
+    }
+
+    return roles.length > 0 ? roles.join(', ') : 'Chưa phân phối';
   };
 
   const canEdit = (targetUser: UserProfile) => {
