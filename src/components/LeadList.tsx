@@ -142,6 +142,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       history.push(`[${new Date().toLocaleString()}] ${user.displayName || user.email}: ${newLead.details}`);
     }
 
+    // If staff creates a lead, assign it to them by default if not specified
+    const finalAssignedToEmail = newLead.assignedToEmail || (user.role === 'staff' ? user.email : '');
+
     await createLead({
       customerName: newLead.customerName!,
       phone: newLead.phone!,
@@ -155,7 +158,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       departmentId: finalDepartmentId,
       projectId: newLead.projectId,
       customerCode: customerCode,
-      assignedToEmail: newLead.assignedToEmail,
+      assignedToEmail: finalAssignedToEmail,
       creatorEmail: user.email,
       updatedByEmail: user.email,
       history: history
@@ -308,29 +311,18 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             )}
           </button>
           
-          {selectedProjectId ? (
-            <button 
-              onClick={() => setSelectedProjectId('')}
-              className="flex-1 lg:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+            <select 
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer min-w-[120px]"
             >
-              <span className="sm:hidden">Tất cả</span>
-              <span className="hidden sm:inline">Xem tất cả</span>
-            </button>
-          ) : (
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-              <select 
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer min-w-[120px]"
-              >
-                <option value="" className="sm:hidden">Dự án...</option>
-                <option value="" className="hidden sm:inline">Chọn dự án...</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+              <option value="">Tất cả dự án</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </motion.div>
 
@@ -596,19 +588,21 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 </div>
               </div>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho nhân viên</label>
-                  <select 
-                    value={newLead.assignedToEmail}
-                    onChange={e => setNewLead(prev => ({ ...prev, assignedToEmail: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  >
-                    <option value="">Chọn nhân viên</option>
-                    {staff.map(s => (
-                      <option key={s.uid} value={s.email}>{s.displayName} ({s.email})</option>
-                    ))}
-                  </select>
-                </div>
+                {(user.role === 'admin' || user.role === 'tp') && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho nhân viên</label>
+                    <select 
+                      value={newLead.assignedToEmail}
+                      onChange={e => setNewLead(prev => ({ ...prev, assignedToEmail: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    >
+                      <option value="">Chọn nhân viên</option>
+                      {staff.map(s => (
+                        <option key={s.uid} value={s.email}>{s.displayName} ({s.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>

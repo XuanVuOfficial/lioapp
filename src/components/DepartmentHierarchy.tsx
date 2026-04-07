@@ -151,7 +151,19 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
 
   const rootNodes = isAdmin 
     ? departments.filter(d => !d.parentId)
-    : departments.filter(d => user.managedDeptIds?.includes(d.id) || d.id === user.departmentId);
+    : departments.filter(d => {
+        const isManaged = user.managedDeptIds?.includes(d.id);
+        if (isManaged) {
+          // Only show as root if its parent is NOT also managed by the user
+          const parentIsAlsoManaged = d.parentId && user.managedDeptIds?.includes(d.parentId);
+          return !parentIsAlsoManaged;
+        }
+        // If not a manager, show their assigned department as root
+        if (!user.managedDeptIds || user.managedDeptIds.length === 0) {
+          return d.id === user.departmentId;
+        }
+        return false;
+      });
 
   return (
     <div className="space-y-4 md:space-y-6">
