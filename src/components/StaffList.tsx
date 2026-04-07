@@ -299,10 +299,6 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     />
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Phòng ban</p>
-                  <p className="font-semibold text-slate-900">{getDeptName(newUser.departmentId)}</p>
-                </div>
               </div>
 
               <div className="flex gap-3 mt-8">
@@ -350,10 +346,6 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   <p className="text-sm font-medium text-slate-500">Nhân viên</p>
                   <p className="font-semibold text-slate-900">{editingUser.displayName}</p>
                   <p className="text-xs text-slate-500">{editingUser.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Phòng ban</p>
-                  <p className="font-semibold text-slate-900">{getDeptName(editingUser.departmentId)}</p>
                 </div>
               </div>
 
