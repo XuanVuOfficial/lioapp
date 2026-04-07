@@ -23,6 +23,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [showAssignModal, setShowAssignModal] = useState<Lead | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
+  const [selectedDeptId, setSelectedDeptId] = useState<string>('');
   const [showStats, setShowStats] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
     const saved = localStorage.getItem('leadViewMode');
@@ -93,8 +94,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     
     const matchesTab = currentTab === 'Tất cả' || l.status === currentTab;
     const matchesProject = !selectedProjectId || l.projectId === selectedProjectId;
+    const matchesDept = !selectedDeptId || l.departmentId === selectedDeptId;
     
-    return matchesSearch && matchesTab && matchesProject;
+    return matchesSearch && matchesTab && matchesProject && matchesDept;
   });
 
   // Statistics Data
@@ -180,11 +182,49 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const subDepts = user.departmentId ? getSubDepartments(user.departmentId) : [];
 
+  const allowedDepartments = React.useMemo(() => {
+    if (user.role === 'admin') return departments;
+    if (user.role === 'tp' && user.managedDeptIds) {
+      // Get all managed depts and their children
+      const getSubDeptIds = (deptId: string): string[] => {
+        const ids = [deptId];
+        departments.filter(d => d.parentId === deptId).forEach(child => {
+          ids.push(...getSubDeptIds(child.id));
+        });
+        return ids;
+      };
+      
+      const allManagedIds = new Set<string>();
+      user.managedDeptIds.forEach(id => {
+        getSubDeptIds(id).forEach(subId => allManagedIds.add(subId));
+      });
+      
+      return departments.filter(d => allManagedIds.has(d.id));
+    }
+    // Staff only sees their own department
+    return departments.filter(d => d.id === user.departmentId);
+  }, [user, departments]);
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-xl md:text-2xl font-bold text-slate-900">Khách hàng tiềm năng</h2>
         <div className="flex flex-col sm:flex-row w-full md:w-auto gap-2 md:gap-3">
+          {/* Department Filter */}
+          <div className="relative flex-1 md:w-48">
+            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <select
+              value={selectedDeptId}
+              onChange={(e) => setSelectedDeptId(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none bg-white"
+            >
+              <option value="">Tất cả phòng ban</option>
+              {allowedDepartments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 

@@ -94,20 +94,23 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
 export const subscribeToLeads = (role: UserRole, email: string, departmentIds: string[] | undefined, callback: (leads: Lead[]) => void) => {
   let q = query(collection(db, COLLECTION), orderBy('updatedAt', 'desc'));
 
-  if (role === 'tp' && departmentIds && departmentIds.length > 0) {
-    if (departmentIds.length <= 10) {
-      q = query(collection(db, COLLECTION), where('departmentId', 'in', departmentIds), orderBy('updatedAt', 'desc'));
-    }
-  } else if (role === 'staff') {
-    q = query(collection(db, COLLECTION), where('assignedToEmail', '==', email), orderBy('updatedAt', 'desc'));
+  // If we have departmentIds, we can narrow down the query
+  if (departmentIds && departmentIds.length > 0 && departmentIds.length <= 10) {
+    q = query(collection(db, COLLECTION), where('departmentId', 'in', departmentIds), orderBy('updatedAt', 'desc'));
   }
 
   return onSnapshot(q, (snapshot) => {
     let leads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Lead);
     
-    // Client-side filtering for cases where we have more than 10 departments or other complex logic
+    // Client-side filtering for complex roles and large department lists
     if (role === 'tp' && departmentIds && departmentIds.length > 10) {
       leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
+    } else if (role === 'staff') {
+      // Staff sees leads in their department AND (assigned to them OR created by them)
+      leads = leads.filter(l => 
+        (departmentIds && l.departmentId && departmentIds.includes(l.departmentId)) &&
+        (l.assignedToEmail === email || l.creatorEmail === email)
+      );
     }
     
     callback(leads);
