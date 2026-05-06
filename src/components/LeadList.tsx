@@ -24,6 +24,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
+  const [selectedAssignDeptId, setSelectedAssignDeptId] = useState<string>('');
   const [showStats, setShowStats] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -108,10 +109,27 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const handleCreate = async () => {
-    if (!newLead.customerName || !newLead.phone) return;
+    if (!newLead.customerName || !newLead.phone) {
+      alert('Vui lòng nhập tên và số điện thoại khách hàng.');
+      return;
+    }
+
+    if (!newLead.projectId) {
+      alert('Vui lòng chọn dự án quan tâm.');
+      return;
+    }
+
+    let finalDepartmentId = newLead.departmentId;
+
+    if (['tgd', 'admin', 'gds', 'tp'].includes(user.role)) {
+      if (!selectedAssignDeptId) {
+        alert('Vui lòng chọn nhánh phòng ban.');
+        return;
+      }
+      finalDepartmentId = selectedAssignDeptId;
+    }
 
     let customerCode = '';
-    let finalDepartmentId = newLead.departmentId;
 
     if (newLead.assignedToEmail) {
       const assignedStaff = staff.find(s => s.email === newLead.assignedToEmail);
@@ -158,6 +176,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     });
     setShowAddModal(false);
     setNewLead({ status: 'Chưa liên hệ', subStatus: '', appointmentStatus: '', resultStatus: '', departmentId: user.departmentId || '', projectId: '', assignedToEmail: '' });
+    setSelectedAssignDeptId('');
   };
 
   const handleUpdateStatus = async (lead: Lead, status: string) => {
@@ -215,6 +234,38 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     // Staff only sees their own department
     return departments.filter(d => d.id === user.departmentId);
   }, [user, departments]);
+
+  const getSubDeptIdsRecursive = React.useCallback((deptId: string): string[] => {
+    const ids = [deptId];
+    departments.filter(d => d.parentId === deptId).forEach(child => {
+      ids.push(...getSubDeptIdsRecursive(child.id));
+    });
+    return ids;
+  }, [departments]);
+
+  const assignableStaff = React.useMemo(() => {
+    if (!['tgd', 'admin', 'gds', 'tp'].includes(user.role)) return [];
+    
+    let validDeptIds: string[];
+    if (selectedAssignDeptId) {
+      validDeptIds = getSubDeptIdsRecursive(selectedAssignDeptId);
+    } else {
+      validDeptIds = allowedDepartments.map(d => d.id);
+    }
+    
+    return staff.filter(s => s.departmentId && validDeptIds.includes(s.departmentId));
+  }, [staff, selectedAssignDeptId, user.role, getSubDeptIdsRecursive, allowedDepartments]);
+
+  const getRoleName = (role: string) => {
+    switch (role) {
+      case 'tgd': return 'Tổng giám đốc';
+      case 'admin': return 'QTV';
+      case 'gds': return 'Giám đốc sàn';
+      case 'tp': return 'Trưởng phòng';
+      case 'staff': return 'Nhân viên';
+      default: return role;
+    }
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -563,92 +614,38 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               </div>
               <div className="space-y-4">
                 {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho nhân viên</label>
-                    <select 
-                      value={newLead.assignedToEmail}
-                      onChange={e => setNewLead(prev => ({ ...prev, assignedToEmail: e.target.value }))}
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                    >
-                      <option value="">Chọn nhân viên</option>
-                      {staff.map(s => (
-                        <option key={s.uid} value={s.email}>{s.displayName} ({s.email})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                    <select 
-                      value={newLead.status}
-                      onChange={e => {
-                        const status = e.target.value;
-                        setNewLead(prev => ({ 
-                          ...prev, 
-                          status, 
-                          subStatus: '', 
-                          appointmentStatus: '', 
-                          resultStatus: '' 
-                        }));
-                      }}
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                    >
-                      {statuses.filter(s => s !== 'Tất cả').map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {newLead.status && subStatuses[newLead.status as keyof typeof subStatuses] && (
+                  <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Chi tiết trạng thái</label>
-                      <select 
-                        value={newLead.subStatus}
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Chọn nhánh phòng ban cần chia *</label>
+                      <select
+                        value={selectedAssignDeptId}
                         onChange={e => {
-                          const subStatus = e.target.value;
-                          setNewLead(prev => ({ 
-                            ...prev, 
-                            subStatus,
-                            appointmentStatus: '',
-                            resultStatus: ''
-                          }));
+                          setSelectedAssignDeptId(e.target.value);
+                          setNewLead(prev => ({ ...prev, assignedToEmail: '' })); // reset staff on change
                         }}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white"
                       >
-                        <option value="">Chọn chi tiết</option>
-                        {subStatuses[newLead.status as keyof typeof subStatuses].map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {newLead.subStatus === 'Đang tư vấn' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Hẹn khách</label>
-                      <select 
-                        value={newLead.appointmentStatus}
-                        onChange={e => setNewLead(prev => ({ ...prev, appointmentStatus: e.target.value }))}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      >
-                        <option value="">Chọn trạng thái hẹn</option>
-                        {appointmentOptions.map(o => (
-                          <option key={o} value={o}>{o}</option>
+                        <option value="" disabled hidden>Chọn phòng ban</option>
+                        {allowedDepartments
+                          .filter(d => {
+                            const path = getDepartmentPath(d.id);
+                            return path !== 'Tổng sàn' && path !== 'Tổng sàn > Admin' && path !== 'Tổng sàn > admin';
+                          })
+                          .map(d => (
+                          <option key={d.id} value={d.id}>{getDepartmentPath(d.id)}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Kết quả</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho nhân viên</label>
                       <select 
-                        value={newLead.resultStatus}
-                        onChange={e => setNewLead(prev => ({ ...prev, resultStatus: e.target.value }))}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        value={newLead.assignedToEmail}
+                        onChange={e => setNewLead(prev => ({ ...prev, assignedToEmail: e.target.value }))}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white"
                       >
-                        <option value="">Chọn kết quả</option>
-                        {resultOptions.map(o => (
-                          <option key={o} value={o}>{o}</option>
+                        <option value="">Chọn nhân viên</option>
+                        {assignableStaff.map(s => (
+                          <option key={s.uid} value={s.email}>{s.displayName} ({getRoleName(s.role)})</option>
                         ))}
                       </select>
                     </div>
