@@ -143,6 +143,57 @@ export const Settings: React.FC<Props> = ({ user }) => {
           </motion.div>
         ))}
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+      >
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+          <h3 className="font-bold text-slate-900">Giới hạn số lượng nhân sự theo phòng ban</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Thiết lập số lượng tối đa nhân sự từng vào trò có thể được thêm vào 1 phòng ban. Để trống để không giới hạn.
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { id: 'tgd', label: 'Tổng giám đốc (TGD)' },
+              { id: 'admin', label: 'Admin' },
+              { id: 'gds', label: 'Giám đốc sàn (GĐS)' },
+              { id: 'tp', label: 'Trưởng phòng (TP)' },
+              { id: 'staff', label: 'Nhân viên (Staff)' }
+            ].map(role => (
+              <div key={role.id} className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  {role.label}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Không giới hạn"
+                    className="w-full pl-4 pr-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50 outline-none transition-all"
+                    value={settings.roleLimits?.[role.id as keyof AppSettings['roleLimits']] || ''}
+                    onChange={(e) => {
+                      const val = e.target.value ? parseInt(e.target.value) : null;
+                      setSettings({
+                        ...settings,
+                        roleLimits: {
+                          ...(settings.roleLimits || {
+                            tgd: null, admin: null, gds: null, tp: null, staff: null
+                          }),
+                          [role.id]: val
+                        }
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };

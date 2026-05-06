@@ -73,6 +73,19 @@ export const createStaffAccount = async (profile: Omit<UserProfile, 'uid'>, pass
   }
 };
 
+export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>): Promise<void> => {
+  try {
+    const docRef = doc(db, COLLECTION, uid);
+    // Remove undefined fields
+    const updateData = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${uid}`);
+  }
+};
+
 export const updateUserRole = async (uid: string, role: UserRole, departmentId?: string): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION, uid);

@@ -7,6 +7,13 @@ const DOC_ID = 'app_settings';
 
 export interface AppSettings {
   tabVisibility: Record<string, string[]>; // role -> list of tab IDs
+  roleLimits?: {
+    tgd: number | null;
+    admin: number | null;
+    gds: number | null;
+    tp: number | null;
+    staff: number | null;
+  };
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -14,6 +21,13 @@ const DEFAULT_SETTINGS: AppSettings = {
     admin: ['dashboard', 'leads', 'projects', 'departments', 'staff', 'settings'],
     tp: ['dashboard', 'leads', 'projects', 'departments', 'staff'],
     staff: ['dashboard', 'leads']
+  },
+  roleLimits: {
+    tgd: null,
+    admin: null,
+    gds: null,
+    tp: null,
+    staff: null
   }
 };
 

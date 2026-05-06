@@ -103,8 +103,12 @@ export const subscribeToLeads = (role: UserRole, email: string, departmentIds: s
     let leads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Lead);
     
     // Client-side filtering for complex roles and large department lists
-    if (role === 'tp' && departmentIds && departmentIds.length > 10) {
-      leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
+    if (['tgd', 'admin'].includes(role)) {
+      // Sees everything
+    } else if (['gds', 'tp'].includes(role)) {
+      if (departmentIds) {
+        leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
+      }
     } else if (role === 'staff') {
       // Staff sees leads in their department AND (assigned to them OR created by them)
       leads = leads.filter(l => 

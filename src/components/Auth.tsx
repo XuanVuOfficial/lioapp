@@ -18,26 +18,26 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const loginEmail = email === 'admin' ? 'admin@salespro.com' : email;
+      const loginEmail = email === 'admin' ? 'Tongsan@gmail.com' : email;
       
       let profile = await verifyCredentials(loginEmail, password);
       
-      // Bootstrap admin if it doesn't exist
-      if (!profile && email === 'admin' && password === 'admin12345') {
+      // Bootstrap TGĐ if it doesn't exist
+      if (!profile && loginEmail === 'Tongsan@gmail.com' && password === '12345') {
         profile = {
-          uid: 'admin_root',
-          email: 'admin@salespro.com',
-          displayName: 'Admin',
-          role: 'admin',
-          password: 'admin12345'
+          uid: 'tgd_root',
+          email: 'Tongsan@gmail.com',
+          displayName: 'Tổng giám đốc',
+          role: 'tgd',
+          password: '12345'
         };
         await createUserProfile(profile);
       }
 
       if (profile) {
-        // Force admin role for admin email
-        if (profile.email === 'admin@salespro.com') {
-          profile.role = 'admin';
+        // Force TGD role for TGD email
+        if (profile.email === 'Tongsan@gmail.com') {
+          profile.role = 'tgd';
         }
         localStorage.setItem('salespro_uid', profile.uid);
         onLogin(profile);
@@ -122,7 +122,8 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
         <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
           <p className="text-xs text-slate-500 font-medium mb-1">Tài khoản mặc định:</p>
           <p className="text-xs text-slate-400">Tên đăng nhập: <span className="text-slate-600 font-mono">admin</span></p>
-          <p className="text-xs text-slate-400">Mật khẩu: <span className="text-slate-600 font-mono">admin12345</span></p>
+          <p className="text-xs text-slate-400">Email: <span className="text-slate-600 font-mono">Tongsan@gmail.com</span></p>
+          <p className="text-xs text-slate-400">Mật khẩu: <span className="text-slate-600 font-mono">12345</span></p>
         </div>
       </motion.div>
     </div>

@@ -186,20 +186,20 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const subDepts = user.departmentId ? getSubDepartments(user.departmentId) : [];
 
   const allowedDepartments = React.useMemo(() => {
-    if (user.role === 'admin') return departments;
-    if (user.role === 'tp' && user.managedDeptIds) {
+    if (['tgd', 'admin'].includes(user.role)) return departments;
+    if (['gds', 'tp'].includes(user.role) && user.managedDeptIds) {
       // Get all managed depts and their children
-      const getSubDeptIds = (deptId: string): string[] => {
+      const getAllSubDeptIds = (deptId: string): string[] => {
         const ids = [deptId];
         departments.filter(d => d.parentId === deptId).forEach(child => {
-          ids.push(...getSubDeptIds(child.id));
+          ids.push(...getAllSubDeptIds(child.id));
         });
         return ids;
       };
       
       const allManagedIds = new Set<string>();
       user.managedDeptIds.forEach(id => {
-        getSubDeptIds(id).forEach(subId => allManagedIds.add(subId));
+        getAllSubDeptIds(id).forEach(subId => allManagedIds.add(subId));
       });
       
       return departments.filter(d => allManagedIds.has(d.id));
@@ -519,7 +519,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      {(user.role === 'admin' || user.role === 'tp') && (
+                      {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); setShowAssignModal(lead); }}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -588,7 +588,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 </div>
               </div>
               <div className="space-y-4">
-                {(user.role === 'admin' || user.role === 'tp') && (
+                {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho nhân viên</label>
                     <select 

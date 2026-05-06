@@ -16,7 +16,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
 import { AppSettings, subscribeToSettings } from './services/settingsService';
 
-const ADMIN_EMAIL = 'admin@salespro.com';
+const TGD_EMAIL = 'Tongsan@gmail.com';
 
 const getSubDepartmentIds = (deptId: string, allDepts: Department[]): string[] => {
   const ids = [deptId];
@@ -43,9 +43,9 @@ export default function App() {
       if (storedUid) {
         const profile = await getUserProfile(storedUid);
         if (profile) {
-          // Force admin role for admin email
-          if (profile.email === ADMIN_EMAIL) {
-            profile.role = 'admin';
+          // Force TGD role for TGD email
+          if (profile.email === TGD_EMAIL) {
+            profile.role = 'tgd';
           }
           setUser(profile);
         } else {
@@ -82,10 +82,19 @@ export default function App() {
     const managedDepts = departments.filter(d => d.managerEmail === user.email);
     const isManager = managedDepts.length > 0;
     
-    const effectiveRole = user.email === ADMIN_EMAIL ? 'admin' : (isManager ? 'tp' : user.role);
+    let effectiveRole: UserRole = user.role;
     
-    // If they are a manager but don't have a departmentId set to one of their managed depts, 
-    // we should prioritize their managed depts for visibility
+    if (user.email === TGD_EMAIL) {
+      effectiveRole = 'tgd';
+    } else if (isManager) {
+      // Find the highest level department they manage
+      const highestDept = [...managedDepts].sort((a,b) => a.level - b.level)[0];
+      if (highestDept.level === 0) effectiveRole = 'tgd';
+      else if (highestDept.level === 1) effectiveRole = 'admin';
+      else if (highestDept.level === 2) effectiveRole = 'gds';
+      else if (highestDept.level === 3) effectiveRole = 'tp';
+    } 
+
     const effectiveDeptId = user.departmentId || (isManager ? managedDepts[0].id : undefined);
     
     return {
@@ -99,14 +108,16 @@ export default function App() {
   useEffect(() => {
     if (!effectiveUser) return;
 
-    const allowedDeptIds = effectiveUser.role === 'tp' && effectiveUser.departmentId
-      ? getSubDepartmentIds(effectiveUser.departmentId, departments)
-      : (effectiveUser.departmentId ? [effectiveUser.departmentId] : undefined);
+    const isHighLevel = ['tgd', 'admin'].includes(effectiveUser.role);
+    
+    const allowedDeptIds = isHighLevel 
+      ? undefined // See all for high level
+      : (effectiveUser.departmentId ? getSubDepartmentIds(effectiveUser.departmentId, departments) : undefined);
 
     const unsubLeads = subscribeToLeads(effectiveUser.role, effectiveUser.email, allowedDeptIds, setLeads);
 
     let unsubStaff: () => void = () => {};
-    if (effectiveUser.role === 'admin' || effectiveUser.role === 'tp') {
+    if (['tgd', 'admin', 'gds', 'tp'].includes(effectiveUser.role)) {
       unsubStaff = subscribeToAllUsers(setStaff);
     }
 
@@ -118,8 +129,8 @@ export default function App() {
 
   const filteredStaff = React.useMemo(() => {
     if (!effectiveUser) return [];
-    if (effectiveUser.role === 'admin') return staff;
-    if (effectiveUser.role === 'tp' && effectiveUser.departmentId) {
+    if (['tgd', 'admin'].includes(effectiveUser.role)) return staff;
+    if (['gds', 'tp'].includes(effectiveUser.role) && effectiveUser.departmentId) {
       const allowedDeptIds = getSubDepartmentIds(effectiveUser.departmentId, departments);
       return staff.filter(s => s.departmentId && allowedDeptIds.includes(s.departmentId));
     }

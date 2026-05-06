@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'tp' | 'staff';
+export type UserRole = 'tgd' | 'admin' | 'gds' | 'tp' | 'staff';
 
 export interface UserProfile {
   uid: string;
@@ -8,6 +8,9 @@ export interface UserProfile {
   departmentId?: string;
   password?: string;
   managedDeptIds?: string[];
+  createdAt?: number;
+  createdBy?: string;
+  updatedAt?: number;
 }
 
 export interface Department {
