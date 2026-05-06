@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Plus, Trash2, Edit2, Mail, User, Briefcase, UserPlus, X, Search, Shield } from 'lucide-react';
 import { Department, UserProfile, UserRole } from '../types';
-import { createDepartment, deleteDepartment } from '../services/departmentService';
+import { createDepartment, deleteDepartment, updateDepartment } from '../services/departmentService';
 import { updateUserRole, createUserProfile } from '../services/userService';
 import { getAppSettings, AppSettings } from '../services/settingsService';
 
@@ -39,6 +39,8 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
   const [expandedManagers, setExpandedManagers] = useState<Record<string, boolean>>({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingDept, setEditingDept] = useState<{id: string, name: string} | null>(null);
   const [parentId, setParentId] = useState<string | undefined>(undefined);
   const [selectedDeptId, setSelectedDeptId] = useState<string | undefined>(undefined);
   const [newDept, setNewDept] = useState({ name: '', managerEmail: '', managerName: '' });
@@ -204,21 +206,30 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
                     <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   </button>
                   {isTGD && (
-                    <button 
-                      onClick={() => {
-                        if (children.length > 0) {
-                          alert(`Không thể xóa phòng ban này vì vẫn còn ${children.length} phòng ban con bên trong. Vui lòng xóa các phòng ban con trước để tránh mất dữ liệu.`);
-                          return;
-                        }
-                        if (window.confirm('Bạn có chắc chắn muốn xóa phòng ban này?')) {
-                          deleteDepartment(node.id);
-                        }
-                      }}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
-                      title="Xóa phòng ban"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => { setEditingDept({ id: node.id, name: node.name }); setShowEditModal(true); }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        title="Sửa tên phòng ban"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (children.length > 0) {
+                            alert(`Không thể xóa phòng ban này vì vẫn còn ${children.length} phòng ban con bên trong. Vui lòng xóa các phòng ban con trước để tránh mất dữ liệu.`);
+                            return;
+                          }
+                          if (window.confirm('Bạn có chắc chắn muốn xóa phòng ban này?')) {
+                            deleteDepartment(node.id);
+                          }
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                        title="Xóa phòng ban"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -288,6 +299,47 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
           rootNodes.map(node => renderNode(node))
         )}
       </div>
+
+      {showEditModal && editingDept && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 mb-6">Sửa tên phòng ban</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tên mới</label>
+                <input 
+                  type="text" 
+                  value={editingDept.name}
+                  onChange={e => setEditingDept(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  placeholder="Nhập tên phòng ban..."
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition-all"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={async () => {
+                  if (editingDept && editingDept.name.trim()) {
+                    await updateDepartment(editingDept.id, { name: editingDept.name.trim() });
+                    setShowEditModal(false);
+                  }
+                }}
+                disabled={!editingDept.name.trim()}
+                className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
