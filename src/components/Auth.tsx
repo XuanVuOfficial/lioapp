@@ -60,10 +60,8 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
         className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-100">
-            <Briefcase className="text-white w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">SalesPro CRM</h1>
+          <img src="https://app.xuanvu.click/khachhang/icon.jpg" alt="HKTT Icon" className="w-16 h-16 rounded-2xl mx-auto mb-6 object-cover shadow-lg shadow-emerald-100" />
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">HKTT</h1>
           <p className="text-slate-600">Đăng nhập để quản lý quy trình bán hàng.</p>
         </div>
 
