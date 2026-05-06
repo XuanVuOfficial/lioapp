@@ -185,6 +185,21 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const subDepts = user.departmentId ? getSubDepartments(user.departmentId) : [];
 
+  const getDepartmentPath = (deptId: string): string => {
+    const path: string[] = [];
+    let currentId: string | null = deptId;
+    while (currentId) {
+      const dept = departments.find(d => d.id === currentId);
+      if (dept) {
+        path.unshift(dept.name);
+        currentId = dept.parentId;
+      } else {
+        currentId = null;
+      }
+    }
+    return path.join(' > ');
+  };
+
   const allowedDepartments = React.useMemo(() => {
     if (['tgd', 'admin'].includes(user.role)) return departments;
     if (['gds', 'tp'].includes(user.role) && user.managedDeptIds) {
@@ -223,7 +238,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             >
               <option value="">Tất cả phòng ban</option>
               {allowedDepartments.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
+                <option key={d.id} value={d.id}>{getDepartmentPath(d.id)}</option>
               ))}
             </select>
           </div>

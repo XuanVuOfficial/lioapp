@@ -206,6 +206,10 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
                   {isTGD && (
                     <button 
                       onClick={() => {
+                        if (children.length > 0) {
+                          alert(`Không thể xóa phòng ban này vì vẫn còn ${children.length} phòng ban con bên trong. Vui lòng xóa các phòng ban con trước để tránh mất dữ liệu.`);
+                          return;
+                        }
                         if (window.confirm('Bạn có chắc chắn muốn xóa phòng ban này?')) {
                           deleteDepartment(node.id);
                         }
