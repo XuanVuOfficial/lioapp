@@ -21,6 +21,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAssignModal, setShowAssignModal] = useState<Lead | null>(null);
+  const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
+  const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
@@ -546,12 +548,38 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                           <UserPlus className="w-4 h-4" />
                         </button>
                       )}
-                      <button 
-                        onClick={e => e.stopPropagation()}
-                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                      <div className="relative">
+                        <button 
+                          onClick={e => {
+                            e.stopPropagation();
+                            setActionMenuOpenId(actionMenuOpenId === lead.id ? null : lead.id);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        {actionMenuOpenId === lead.id && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenuOpenId(null); }} />
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 py-1" onClick={e => e.stopPropagation()}>
+                              {['tgd', 'admin'].includes(user.role) ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionMenuOpenId(null);
+                                    setLeadToEdit(lead);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                >
+                                  <Edit2 className="w-4 h-4" /> Sửa thông tin
+                                </button>
+                              ) : (
+                                <div className="px-4 py-2 text-sm text-slate-500 italic">Không có hành động</div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -782,6 +810,76 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         </div>
       )}
 
+      {/* Edit Lead Modal */}
+      {leadToEdit && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 mb-6">Sửa thông tin khách hàng</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tên khách hàng *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={leadToEdit.customerName}
+                  onChange={e => setLeadToEdit(prev => prev ? ({ ...prev, customerName: e.target.value }) : null)}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={leadToEdit.phone}
+                  onChange={e => setLeadToEdit(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input 
+                  type="email" 
+                  value={leadToEdit.email || ''}
+                  onChange={e => setLeadToEdit(prev => prev ? ({ ...prev, email: e.target.value }) : null)}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setLeadToEdit(null)}
+                className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition-all"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={async () => {
+                  if (!leadToEdit.customerName || !leadToEdit.phone) {
+                    alert('Vui lòng nhập tên và số điện thoại.');
+                    return;
+                  }
+                  const timestamp = new Date().toLocaleString('vi-VN');
+                  const username = user.displayName || user.email;
+                  const entry = `[${timestamp}] ${username}: cập nhật thông tin (Tên: ${leadToEdit.customerName}, SĐT: ${leadToEdit.phone})`;
+                  const updatedHistory = [...(leadToEdit.history || []), entry];
+                  await updateLead(leadToEdit.id, { 
+                    customerName: leadToEdit.customerName, 
+                    phone: leadToEdit.phone,
+                    email: leadToEdit.email,
+                    history: updatedHistory
+                  }, user.email);
+                  setLeadToEdit(null);
+                }}
+                className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100"
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Details Modal */}
       {selectedLead && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -854,114 +952,138 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Cập nhật thông tin</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Trạng thái</label>
-                      <select 
-                        value={selectedLead.status}
-                        onChange={async (e) => {
-                          const status = e.target.value;
-                          const updates: Partial<Lead> = { 
-                            status, 
-                            subStatus: '', 
-                            appointmentStatus: '', 
-                            resultStatus: '' 
-                          };
-                          const timestamp = new Date().toLocaleString('vi-VN');
-                          const username = user.displayName || user.email;
-                          const entry = `[${timestamp}] ${username}: cập nhật Trạng thái là '${status}'`;
-                          const updatedHistory = [...(selectedLead.history || []), entry];
-                          await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
-                          setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
-                        }}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      >
-                        {statuses.filter(s => s !== 'Tất cả').map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedLead.status && subStatuses[selectedLead.status as keyof typeof subStatuses] && (
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Chi tiết trạng thái</label>
-                        <select 
-                          value={selectedLead.subStatus || ''}
-                          onChange={async (e) => {
-                            const subStatus = e.target.value;
-                            const updates: Partial<Lead> = { 
-                              subStatus,
-                              appointmentStatus: '',
-                              resultStatus: ''
-                            };
-                            const timestamp = new Date().toLocaleString('vi-VN');
-                            const username = user.displayName || user.email;
-                            const actionText = subStatus ? `cập nhật Trạng thái là '${selectedLead.status} > ${subStatus}'` : `đã xóa Trạng thái chi tiết (trước đó là '${selectedLead.subStatus}')`;
-                            const entry = `[${timestamp}] ${username}: ${actionText}`;
-                            const updatedHistory = [...(selectedLead.history || []), entry];
-                            await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
-                            setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
-                          }}
-                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                        >
-                          <option value="">Chọn chi tiết</option>
-                          {subStatuses[selectedLead.status as keyof typeof subStatuses].map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedLead.subStatus === 'Đang tư vấn' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Hẹn khách</label>
-                        <select 
-                          value={selectedLead.appointmentStatus || ''}
-                          onChange={async (e) => {
-                            const appointmentStatus = e.target.value;
-                            const timestamp = new Date().toLocaleString('vi-VN');
-                            const username = user.displayName || user.email;
-                            const actionText = appointmentStatus ? `cập nhật Hẹn khách là '${appointmentStatus}'` : `đã xóa Hẹn khách (trước đó là '${selectedLead.appointmentStatus}')`;
-                            const entry = `[${timestamp}] ${username}: ${actionText}`;
-                            const updatedHistory = [...(selectedLead.history || []), entry];
-                            await updateLead(selectedLead.id, { appointmentStatus, history: updatedHistory }, user.email);
-                            setSelectedLead({ ...selectedLead, appointmentStatus, history: updatedHistory });
-                          }}
-                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                        >
-                          <option value="">Chọn trạng thái hẹn</option>
-                          {appointmentOptions.map(o => (
-                            <option key={o} value={o}>{o}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {selectedLead.appointmentStatus && (
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-1">Kết quả</label>
-                          <select 
-                            value={selectedLead.resultStatus || ''}
-                            onChange={async (e) => {
-                              const resultStatus = e.target.value;
-                              const timestamp = new Date().toLocaleString('vi-VN');
-                              const username = user.displayName || user.email;
-                              const actionText = resultStatus ? `cập nhật Kết quả là '${resultStatus}'` : `đã xóa Kết quả (trước đó là '${selectedLead.resultStatus}')`;
-                              const entry = `[${timestamp}] ${username}: ${actionText}`;
-                              const updatedHistory = [...(selectedLead.history || []), entry];
-                              await updateLead(selectedLead.id, { resultStatus, history: updatedHistory }, user.email);
-                              setSelectedLead({ ...selectedLead, resultStatus, history: updatedHistory });
-                            }}
-                            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                          >
-                            <option value="">Chọn kết quả</option>
-                            {resultOptions.map(o => (
-                              <option key={o} value={o}>{o}</option>
-                            ))}
-                          </select>
+                  {(()=>{
+                    const isRoleAllowedToEditStatus = ['tgd', 'admin', 'gds'].includes(user.role);
+                    const isStatusDisabled = !isRoleAllowedToEditStatus && selectedLead.status !== 'Chưa liên hệ';
+                    const isSubStatusDisabled = !isRoleAllowedToEditStatus && !!selectedLead.subStatus;
+                    const isAppointmentStatusDisabled = !isRoleAllowedToEditStatus && !!selectedLead.appointmentStatus;
+                    const isResultStatusDisabled = !isRoleAllowedToEditStatus && !!selectedLead.resultStatus;
+                    
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">Trạng thái</label>
+                            <select 
+                              value={selectedLead.status}
+                              disabled={isStatusDisabled}
+                              onChange={async (e) => {
+                                const status = e.target.value;
+                                const updates: Partial<Lead> = { 
+                                  status, 
+                                  subStatus: '', 
+                                  appointmentStatus: '', 
+                                  resultStatus: '' 
+                                };
+                                const timestamp = new Date().toLocaleString('vi-VN');
+                                const username = user.displayName || user.email;
+                                const entry = `[${timestamp}] ${username}: cập nhật Trạng thái là '${status}'`;
+                                const updatedHistory = [...(selectedLead.history || []), entry];
+                                await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
+                                setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
+                              }}
+                              className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
+                                isStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500'
+                              }`}
+                            >
+                              {statuses.filter(s => s !== 'Tất cả').map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {selectedLead.status && subStatuses[selectedLead.status as keyof typeof subStatuses] && (
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Chi tiết trạng thái</label>
+                              <select 
+                                value={selectedLead.subStatus || ''}
+                                disabled={isSubStatusDisabled}
+                                onChange={async (e) => {
+                                  const subStatus = e.target.value;
+                                  const updates: Partial<Lead> = { 
+                                    subStatus,
+                                    appointmentStatus: '',
+                                    resultStatus: ''
+                                  };
+                                  const timestamp = new Date().toLocaleString('vi-VN');
+                                  const username = user.displayName || user.email;
+                                  const actionText = subStatus ? `cập nhật Trạng thái là '${selectedLead.status} > ${subStatus}'` : `đã xóa Trạng thái chi tiết (trước đó là '${selectedLead.subStatus}')`;
+                                  const entry = `[${timestamp}] ${username}: ${actionText}`;
+                                  const updatedHistory = [...(selectedLead.history || []), entry];
+                                  await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
+                                  setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
+                                }}
+                                className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
+                                  isSubStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500 bg-white'
+                                }`}
+                              >
+                                <option value="">Chọn chi tiết</option>
+                                {subStatuses[selectedLead.status as keyof typeof subStatuses].map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
+
+                        {selectedLead.subStatus === 'Đang tư vấn' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Hẹn khách</label>
+                              <select 
+                                value={selectedLead.appointmentStatus || ''}
+                                disabled={isAppointmentStatusDisabled}
+                                onChange={async (e) => {
+                                  const appointmentStatus = e.target.value;
+                                  const timestamp = new Date().toLocaleString('vi-VN');
+                                  const username = user.displayName || user.email;
+                                  const actionText = appointmentStatus ? `cập nhật Hẹn khách là '${appointmentStatus}'` : `đã xóa Hẹn khách (trước đó là '${selectedLead.appointmentStatus}')`;
+                                  const entry = `[${timestamp}] ${username}: ${actionText}`;
+                                  const updatedHistory = [...(selectedLead.history || []), entry];
+                                  await updateLead(selectedLead.id, { appointmentStatus, history: updatedHistory }, user.email);
+                                  setSelectedLead({ ...selectedLead, appointmentStatus, history: updatedHistory });
+                                }}
+                                className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
+                                  isAppointmentStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500 bg-white'
+                                }`}
+                              >
+                                <option value="">Chọn trạng thái hẹn</option>
+                                {appointmentOptions.map(o => (
+                                  <option key={o} value={o}>{o}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {selectedLead.appointmentStatus && (
+                              <div>
+                                <label className="block text-xs text-slate-500 mb-1">Kết quả</label>
+                                <select 
+                                  value={selectedLead.resultStatus || ''}
+                                  disabled={isResultStatusDisabled}
+                                  onChange={async (e) => {
+                                    const resultStatus = e.target.value;
+                                    const timestamp = new Date().toLocaleString('vi-VN');
+                                    const username = user.displayName || user.email;
+                                    const actionText = resultStatus ? `cập nhật Kết quả là '${resultStatus}'` : `đã xóa Kết quả (trước đó là '${selectedLead.resultStatus}')`;
+                                    const entry = `[${timestamp}] ${username}: ${actionText}`;
+                                    const updatedHistory = [...(selectedLead.history || []), entry];
+                                    await updateLead(selectedLead.id, { resultStatus, history: updatedHistory }, user.email);
+                                    setSelectedLead({ ...selectedLead, resultStatus, history: updatedHistory });
+                                  }}
+                                  className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
+                                    isResultStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500 bg-white'
+                                  }`}
+                                >
+                                  <option value="">Chọn kết quả</option>
+                                  {resultOptions.map(o => (
+                                    <option key={o} value={o}>{o}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs text-slate-500 mb-2">Thêm ghi chú mới (Timeline)</label>
