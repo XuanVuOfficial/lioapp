@@ -33,8 +33,11 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
 
   const [selectedFloorId, setSelectedFloorId] = useState<string>('');
 
+  const [selectedFloorIdEdit, setSelectedFloorIdEdit] = useState<string>('');
+
   const floors = departments.filter(d => d.level === 2);
   const rooms = departments.filter(d => d.level === 3 && (selectedFloorId ? d.parentId === selectedFloorId : true));
+  const roomsEdit = departments.filter(d => d.level === 3 && (selectedFloorIdEdit ? d.parentId === selectedFloorIdEdit : true));
   const adminDepts = departments.filter(d => d.level === 1);
   const tgdDepts = departments.filter(d => d.level === 0);
 
@@ -106,8 +109,29 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     
     setIsLoading(true);
     try {
+      const settings = await getAppSettings();
+      
+      // Check limits if role or department changed
+      if (
+        (editingUser.role !== users.find(u => u.uid === editingUser.uid)?.role || 
+         editingUser.departmentId !== users.find(u => u.uid === editingUser.uid)?.departmentId) &&
+         settings.roleLimits && settings.roleLimits[editingUser.role]
+      ) {
+        const limit = settings.roleLimits[editingUser.role] as number;
+        // count existing users in that department with that role
+        // exclude the current user from the count
+        const currentCount = users.filter(u => u.departmentId === editingUser.departmentId && u.role === editingUser.role && u.uid !== editingUser.uid).length;
+        if (currentCount >= limit) {
+          alert(`Phòng ban này đã đạt giới hạn tối đa ${limit} nhân sự ở vai trò này.`);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const updates: Partial<UserProfile> = {
         displayName: editingUser.displayName,
+        role: editingUser.role,
+        departmentId: editingUser.departmentId || undefined,
         updatedAt: Date.now()
       };
       if (editingUser.password) {
@@ -231,6 +255,21 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     setShowAddModal(true);
   };
 
+  const handleShowEditModal = (user: UserProfile) => {
+    let floorId = '';
+    if (['staff', 'tp'].includes(user.role)) {
+      const room = departments.find(d => d.id === user.departmentId);
+      if (room && room.parentId) {
+        floorId = room.parentId;
+      }
+    } else if (user.role === 'gds') {
+      floorId = user.departmentId || '';
+    }
+    
+    setSelectedFloorIdEdit(floorId);
+    setEditingUser({ ...user, password: '' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -308,7 +347,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                       </button>
                       {canEdit(user) && (
                         <button 
-                          onClick={() => setEditingUser({ ...user, password: '' })}
+                          onClick={() => handleShowEditModal(user)}
                           className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -316,7 +355,11 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                       )}
                       {canDelete(user) && (
                         <button 
-                          onClick={() => deleteUser(user.uid)}
+                          onClick={() => {
+                            if (window.confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
+                              deleteUser(user.uid);
+                            }
+                          }}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -354,7 +397,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   </button>
                   {canEdit(user) && (
                     <button 
-                      onClick={() => setEditingUser({ ...user, password: '' })}
+                      onClick={() => handleShowEditModal(user)}
                       className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -362,7 +405,11 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   )}
                   {canDelete(user) && (
                     <button 
-                      onClick={() => deleteUser(user.uid)}
+                      onClick={() => {
+                        if (window.confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
+                          deleteUser(user.uid);
+                        }
+                      }}
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -611,6 +658,104 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Cấp bậc / Phân quyền</label>
+                  <select 
+                    value={editingUser.role}
+                    onChange={e => {
+                      const role = e.target.value as UserRole;
+                      setEditingUser(prev => prev ? ({ ...prev, role, departmentId: '' }) : null);
+                      setSelectedFloorIdEdit('');
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  >
+                    <option value="staff">Nhân viên sale</option>
+                    <option value="tp">Trưởng phòng kinh doanh</option>
+                    <option value="gds">Giám đốc sàn</option>
+                    {currentUser.role === 'tgd' && (
+                      <>
+                        <option value="admin">Admin</option>
+                        <option value="tgd">Tổng giám đốc</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                {/* Sàn Selection */}
+                {['staff', 'tp', 'gds'].includes(editingUser.role) && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Thuộc sàn</label>
+                    <select 
+                      value={selectedFloorIdEdit || (editingUser.role === 'gds' ? editingUser.departmentId : '')}
+                      onChange={e => {
+                        const floorId = e.target.value;
+                        setSelectedFloorIdEdit(floorId);
+                        if (editingUser.role === 'gds') {
+                          setEditingUser(prev => prev ? ({ ...prev, departmentId: floorId }) : null);
+                        } else {
+                          setEditingUser(prev => prev ? ({ ...prev, departmentId: '' }) : null);
+                        }
+                      }}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    >
+                      <option value="">Chọn sàn</option>
+                      {floors.map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Phòng Selection */}
+                {['staff', 'tp'].includes(editingUser.role) && selectedFloorIdEdit && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Thuộc phòng</label>
+                    <select 
+                      value={editingUser.departmentId || ''}
+                      onChange={e => setEditingUser(prev => prev ? ({ ...prev, departmentId: e.target.value }) : null)}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    >
+                      <option value="">Chọn phòng</option>
+                      {roomsEdit.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Admin Group Selection */}
+                {editingUser.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nhóm Admin</label>
+                    <select 
+                      value={editingUser.departmentId || ''}
+                      onChange={e => setEditingUser(prev => prev ? ({ ...prev, departmentId: e.target.value }) : null)}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    >
+                      <option value="">Chọn nhóm admin</option>
+                      {adminDepts.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* TGD Group Selection */}
+                {editingUser.role === 'tgd' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Cấp Tổng sàn</label>
+                    <select 
+                      value={editingUser.departmentId || ''}
+                      onChange={e => setEditingUser(prev => prev ? ({ ...prev, departmentId: e.target.value }) : null)}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    >
+                      <option value="">Chọn cấp tổng sàn</option>
+                      {tgdDepts.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 mt-8">
