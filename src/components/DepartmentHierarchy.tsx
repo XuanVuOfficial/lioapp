@@ -203,9 +203,13 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
                   >
                     <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   </button>
-                  {isAdmin && (
+                  {isTGD && (
                     <button 
-                      onClick={() => deleteDepartment(node.id)}
+                      onClick={() => {
+                        if (window.confirm('Bạn có chắc chắn muốn xóa phòng ban này?')) {
+                          deleteDepartment(node.id);
+                        }
+                      }}
                       className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
                       title="Xóa phòng ban"
                     >
