@@ -24,8 +24,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
+  const [assignFilter, setAssignFilter] = useState<'all' | 'mine' | 'assigned_by_me'>(user.role === 'staff' ? 'mine' : 'all');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
+  const [hasInitializedDept, setHasInitializedDept] = useState(false);
   const [selectedAssignDeptId, setSelectedAssignDeptId] = useState<string>('');
   const [showStats, setShowStats] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -82,6 +84,55 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     'Đã cọc'
   ];
 
+  const getSubDeptIdsRecursive = React.useCallback((deptId: string): string[] => {
+    const ids = [deptId];
+    departments.filter(d => d.parentId === deptId).forEach(child => {
+      ids.push(...getSubDeptIdsRecursive(child.id));
+    });
+    return ids;
+  }, [departments]);
+
+  const allowedDepartments = React.useMemo(() => {
+    if (['tgd', 'admin'].includes(user.role)) return departments;
+    if (['gds', 'tp'].includes(user.role)) {
+      const baseIds = (user.managedDeptIds && user.managedDeptIds.length > 0) 
+        ? user.managedDeptIds 
+        : (user.departmentId ? [user.departmentId] : []);
+        
+      // Get all managed depts and their children
+      const getAllSubDeptIds = (deptId: string): string[] => {
+        const ids = [deptId];
+        departments.filter(d => d.parentId === deptId).forEach(child => {
+          ids.push(...getAllSubDeptIds(child.id));
+        });
+        return ids;
+      };
+      
+      const allAllowedIds = new Set<string>();
+      baseIds.forEach(id => {
+        getAllSubDeptIds(id).forEach(subId => allAllowedIds.add(subId));
+      });
+      
+      return departments.filter(d => allAllowedIds.has(d.id));
+    }
+    // Staff only sees their own department
+    return departments.filter(d => d.id === user.departmentId);
+  }, [user, departments]);
+
+  useEffect(() => {
+    if (departments.length > 0 && !hasInitializedDept) {
+      if (['tgd', 'admin'].includes(user.role)) {
+        setSelectedDeptId('');
+        setHasInitializedDept(true);
+      } else if (allowedDepartments.length > 0) {
+        // Auto-select the highest level department in allowed list
+        const topDept = [...allowedDepartments].sort((a, b) => a.level - b.level)[0];
+        setSelectedDeptId(topDept.id);
+        setHasInitializedDept(true);
+      }
+    }
+  }, [departments, allowedDepartments, user.role, hasInitializedDept]);
+
   const filteredLeads = leads.filter(l => {
     const matchesSearch = 
       l.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -90,9 +141,22 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     
     const matchesTab = currentTab === 'Tất cả' || l.status === currentTab;
     const matchesProject = !selectedProjectId || l.projectId === selectedProjectId;
-    const matchesDept = !selectedDeptId || l.departmentId === selectedDeptId;
+
+    let matchesDept = true;
+    if (selectedDeptId) {
+      const allowedIds = getSubDeptIdsRecursive(selectedDeptId);
+      matchesDept = l.departmentId ? allowedIds.includes(l.departmentId) : false;
+    } else {
+      const allowedIds = allowedDepartments.map(d => d.id);
+      matchesDept = l.departmentId ? allowedIds.includes(l.departmentId) : false;
+    }
+
+    const matchesAssign = 
+      assignFilter === 'all' ? true :
+      assignFilter === 'mine' ? l.assignedToEmail === user.email :
+      assignFilter === 'assigned_by_me' ? (l.assignedByEmail === user.email && l.assignedToEmail !== user.email) : true;
     
-    return matchesSearch && matchesTab && matchesProject && matchesDept;
+    return matchesSearch && matchesTab && matchesProject && matchesDept && matchesAssign;
   });
 
   // Statistics Data
@@ -214,37 +278,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     return path.join(' > ');
   };
 
-  const allowedDepartments = React.useMemo(() => {
-    if (['tgd', 'admin'].includes(user.role)) return departments;
-    if (['gds', 'tp'].includes(user.role) && user.managedDeptIds) {
-      // Get all managed depts and their children
-      const getAllSubDeptIds = (deptId: string): string[] => {
-        const ids = [deptId];
-        departments.filter(d => d.parentId === deptId).forEach(child => {
-          ids.push(...getAllSubDeptIds(child.id));
-        });
-        return ids;
-      };
-      
-      const allManagedIds = new Set<string>();
-      user.managedDeptIds.forEach(id => {
-        getAllSubDeptIds(id).forEach(subId => allManagedIds.add(subId));
-      });
-      
-      return departments.filter(d => allManagedIds.has(d.id));
-    }
-    // Staff only sees their own department
-    return departments.filter(d => d.id === user.departmentId);
-  }, [user, departments]);
-
-  const getSubDeptIdsRecursive = React.useCallback((deptId: string): string[] => {
-    const ids = [deptId];
-    departments.filter(d => d.parentId === deptId).forEach(child => {
-      ids.push(...getSubDeptIdsRecursive(child.id));
-    });
-    return ids;
-  }, [departments]);
-
   const assignableStaff = React.useMemo(() => {
     if (!['tgd', 'admin', 'gds', 'tp'].includes(user.role)) return [];
     
@@ -282,10 +315,29 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               onChange={(e) => setSelectedDeptId(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none bg-white"
             >
-              <option value="">Tất cả phòng ban</option>
+              {['tgd', 'admin'].includes(user.role) && (
+                <option value="">Tất cả phòng ban</option>
+              )}
               {allowedDepartments.map(d => (
                 <option key={d.id} value={d.id}>{getDepartmentPath(d.id)}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Assignment Filter for Managers */}
+          <div className="relative flex-1 md:w-48">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <select
+              value={assignFilter}
+              onChange={(e) => setAssignFilter(e.target.value as 'all' | 'mine' | 'assigned_by_me')}
+              disabled={user.role === 'staff'}
+              className={`w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 outline-none transition-all appearance-none bg-white ${
+                user.role === 'staff' ? 'bg-slate-50 cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-emerald-500'
+              }`}
+            >
+              {user.role !== 'staff' && <option value="all">Tất cả</option>}
+              <option value="mine">Tôi đảm nhận</option>
+              {user.role !== 'staff' && <option value="assigned_by_me">Tôi đã chia cho nhân viên</option>}
             </select>
           </div>
 

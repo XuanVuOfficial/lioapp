@@ -13,6 +13,7 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
       id: docRef.id,
       createdAt: now,
       updatedAt: now,
+      assignedByEmail: lead.assignedToEmail ? lead.creatorEmail : undefined,
       history: [`Được tạo bởi ${lead.creatorEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`]
     };
     // Remove undefined fields for Firestore
@@ -77,7 +78,10 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
       history: newHistory
     };
     
-    if (assignedToEmail !== undefined) updateData.assignedToEmail = assignedToEmail;
+    if (assignedToEmail !== undefined) {
+      updateData.assignedToEmail = assignedToEmail;
+      updateData.assignedByEmail = userEmail;
+    }
     if (departmentId !== undefined) updateData.departmentId = departmentId;
 
     // Remove undefined fields for Firestore
