@@ -479,16 +479,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 </div>
 
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-                  <div className="flex items-center justify-between group/phone">
-                    <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                      <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                      {lead.phone}
-                    </div>
-                    <div className="flex gap-1 opacity-0 group-hover/phone:opacity-100 transition-opacity">
-                      <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Gọi"><PhoneCall className="w-3.5 h-3.5" /></a>
-                      <a href={`https://zalo.me/${lead.phone}`} onClick={e => e.stopPropagation()} target="_blank" rel="noreferrer" className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Zalo"><MessageSquare className="w-3.5 h-3.5" /></a>
-                      <a href={`sms:${lead.phone}`} onClick={e => e.stopPropagation()} className="p-1 text-slate-600 hover:bg-slate-50 rounded" title="SMS"><MessageCircle className="w-3.5 h-3.5" /></a>
-                    </div>
+                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
+                    <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
+                    {lead.phone}
                   </div>
 
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
@@ -792,67 +785,67 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       {/* Details Modal */}
       {selectedLead && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-8 border border-slate-200 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-start mb-8">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                  <User className="w-8 h-8 text-emerald-600" />
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full border border-slate-200 overflow-y-auto max-h-[90vh] flex flex-col relative">
+            <div className="sticky top-0 bg-white z-20 px-6 py-4 border-b border-slate-100 flex justify-between items-center shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                  <User className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-3xl font-bold text-slate-900">{selectedLead.customerName}</h3>
-                  <p className="text-slate-500">
-                    {selectedLead.customerCode ? `Mã khách hàng: ${selectedLead.customerCode}` : `ID: ${selectedLead.id}`}
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight">{selectedLead.customerName}</h3>
+                  <p className="text-xs text-slate-500">
+                    {selectedLead.customerCode ? `Mã KH: ${selectedLead.customerCode}` : `ID: ${selectedLead.id}`}
                   </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-100 rounded-lg">
-                <Plus className="w-6 h-6 text-slate-400 rotate-45" />
+              <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Plus className="w-5 h-5 text-slate-400 rotate-45" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="md:col-span-2 space-y-8">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 space-y-6">
                 <section>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Thông tin liên hệ</h4>
-                  <div className="bg-slate-50 p-5 rounded-2xl space-y-5 mb-6">
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Thông tin liên hệ</h4>
+                  <div className="bg-slate-50 p-4 rounded-xl space-y-4 mb-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Số điện thoại</p>
-                        <p className="text-xl font-bold text-slate-900 tracking-tight">{selectedLead.phone}</p>
+                        <p className="text-xs text-slate-500 mb-0.5">Số điện thoại</p>
+                        <p className="text-lg font-bold text-slate-900 tracking-tight">{selectedLead.phone}</p>
                       </div>
-                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center">
-                        <Phone className="w-6 h-6 text-emerald-600" />
+                      <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center">
+                        <Phone className="w-5 h-5 text-emerald-600" />
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                       <a 
                         href={`tel:${selectedLead.phone}`} 
-                        className="flex flex-col items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
+                        className="flex flex-col items-center justify-center gap-1.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
                       >
-                        <PhoneCall className="w-5 h-5" />
+                        <PhoneCall className="w-4 h-4" />
                         <span className="text-[10px] font-bold uppercase">Gọi điện</span>
                       </a>
                       <a 
                         href={`https://zalo.me/${selectedLead.phone}`} 
                         target="_blank" 
                         rel="noreferrer" 
-                        className="flex flex-col items-center justify-center gap-2 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md shadow-blue-100"
+                        className="flex flex-col items-center justify-center gap-1.5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm shadow-blue-100"
                       >
-                        <MessageSquare className="w-5 h-5" />
+                        <MessageSquare className="w-4 h-4" />
                         <span className="text-[10px] font-bold uppercase">Zalo</span>
                       </a>
                       <a 
                         href={`sms:${selectedLead.phone}`} 
-                        className="flex flex-col items-center justify-center gap-2 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all shadow-md shadow-slate-200"
+                        className="flex flex-col items-center justify-center gap-1.5 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all shadow-sm shadow-slate-200"
                       >
-                        <MessageCircle className="w-5 h-5" />
+                        <MessageCircle className="w-4 h-4" />
                         <span className="text-[10px] font-bold uppercase">SMS</span>
                       </a>
                     </div>
                   </div>
                   {selectedLead.notes && (
-                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
                       <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mb-1">Ghi chú ban đầu</p>
                       <p className="text-sm text-slate-700 leading-relaxed">{selectedLead.notes}</p>
                     </div>
@@ -868,14 +861,18 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         value={selectedLead.status}
                         onChange={async (e) => {
                           const status = e.target.value;
-                          const updates = { 
+                          const updates: Partial<Lead> = { 
                             status, 
                             subStatus: '', 
                             appointmentStatus: '', 
                             resultStatus: '' 
                           };
-                          await updateLead(selectedLead.id, updates, user.email);
-                          setSelectedLead({ ...selectedLead, ...updates });
+                          const timestamp = new Date().toLocaleString('vi-VN');
+                          const username = user.displayName || user.email;
+                          const entry = `[${timestamp}] ${username}: cập nhật Trạng thái là '${status}'`;
+                          const updatedHistory = [...(selectedLead.history || []), entry];
+                          await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
+                          setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
                         }}
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       >
@@ -891,13 +888,18 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                           value={selectedLead.subStatus || ''}
                           onChange={async (e) => {
                             const subStatus = e.target.value;
-                            const updates = { 
+                            const updates: Partial<Lead> = { 
                               subStatus,
                               appointmentStatus: '',
                               resultStatus: ''
                             };
-                            await updateLead(selectedLead.id, updates, user.email);
-                            setSelectedLead({ ...selectedLead, ...updates });
+                            const timestamp = new Date().toLocaleString('vi-VN');
+                            const username = user.displayName || user.email;
+                            const actionText = subStatus ? `cập nhật Trạng thái là '${selectedLead.status} > ${subStatus}'` : `đã xóa Trạng thái chi tiết (trước đó là '${selectedLead.subStatus}')`;
+                            const entry = `[${timestamp}] ${username}: ${actionText}`;
+                            const updatedHistory = [...(selectedLead.history || []), entry];
+                            await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
+                            setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
                           }}
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         >
@@ -918,8 +920,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                           value={selectedLead.appointmentStatus || ''}
                           onChange={async (e) => {
                             const appointmentStatus = e.target.value;
-                            await updateLead(selectedLead.id, { appointmentStatus }, user.email);
-                            setSelectedLead({ ...selectedLead, appointmentStatus });
+                            const timestamp = new Date().toLocaleString('vi-VN');
+                            const username = user.displayName || user.email;
+                            const actionText = appointmentStatus ? `cập nhật Hẹn khách là '${appointmentStatus}'` : `đã xóa Hẹn khách (trước đó là '${selectedLead.appointmentStatus}')`;
+                            const entry = `[${timestamp}] ${username}: ${actionText}`;
+                            const updatedHistory = [...(selectedLead.history || []), entry];
+                            await updateLead(selectedLead.id, { appointmentStatus, history: updatedHistory }, user.email);
+                            setSelectedLead({ ...selectedLead, appointmentStatus, history: updatedHistory });
                           }}
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         >
@@ -929,23 +936,30 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Kết quả</label>
-                        <select 
-                          value={selectedLead.resultStatus || ''}
-                          onChange={async (e) => {
-                            const resultStatus = e.target.value;
-                            await updateLead(selectedLead.id, { resultStatus }, user.email);
-                            setSelectedLead({ ...selectedLead, resultStatus });
-                          }}
-                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                        >
-                          <option value="">Chọn kết quả</option>
-                          {resultOptions.map(o => (
-                            <option key={o} value={o}>{o}</option>
-                          ))}
-                        </select>
-                      </div>
+                      {selectedLead.appointmentStatus && (
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">Kết quả</label>
+                          <select 
+                            value={selectedLead.resultStatus || ''}
+                            onChange={async (e) => {
+                              const resultStatus = e.target.value;
+                              const timestamp = new Date().toLocaleString('vi-VN');
+                              const username = user.displayName || user.email;
+                              const actionText = resultStatus ? `cập nhật Kết quả là '${resultStatus}'` : `đã xóa Kết quả (trước đó là '${selectedLead.resultStatus}')`;
+                              const entry = `[${timestamp}] ${username}: ${actionText}`;
+                              const updatedHistory = [...(selectedLead.history || []), entry];
+                              await updateLead(selectedLead.id, { resultStatus, history: updatedHistory }, user.email);
+                              setSelectedLead({ ...selectedLead, resultStatus, history: updatedHistory });
+                            }}
+                            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                          >
+                            <option value="">Chọn kết quả</option>
+                            {resultOptions.map(o => (
+                              <option key={o} value={o}>{o}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="space-y-4">
@@ -958,9 +972,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                           onChange={e => setNewNote(e.target.value)}
                           onKeyPress={async (e) => {
                             if (e.key === 'Enter' && newNote.trim()) {
-                              const timestamp = new Date().toLocaleString();
-                              const entry = `[${timestamp}] ${user.displayName || user.email}: ${newNote}`;
-                              const updatedHistory = [...selectedLead.history, entry];
+                              const timestamp = new Date().toLocaleString('vi-VN');
+                              const username = user.displayName || user.email;
+                              const entry = `[${timestamp}] ${username}: ${newNote.trim()}`;
+                              const updatedHistory = [...(selectedLead.history || []), entry];
                               await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
                               setSelectedLead({ ...selectedLead, history: updatedHistory });
                               setNewNote('');
@@ -972,9 +987,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         <button 
                           onClick={async () => {
                             if (!newNote.trim()) return;
-                            const timestamp = new Date().toLocaleString();
-                            const entry = `[${timestamp}] ${user.displayName || user.email}: ${newNote}`;
-                            const updatedHistory = [...selectedLead.history, entry];
+                            const timestamp = new Date().toLocaleString('vi-VN');
+                            const username = user.displayName || user.email;
+                            const entry = `[${timestamp}] ${username}: ${newNote.trim()}`;
+                            const updatedHistory = [...(selectedLead.history || []), entry];
                             await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
                             setSelectedLead({ ...selectedLead, history: updatedHistory });
                             setNewNote('');
@@ -992,8 +1008,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <History className="w-4 h-4" /> Lịch sử trao đổi
                   </h4>
-                  <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
-                    {selectedLead.history.slice().reverse().map((entry, i) => {
+                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                    {(selectedLead.history || []).slice().reverse().map((entry, i) => {
                       const parts = entry.match(/^\[(.*?)\] (.*?): (.*)$/);
                       if (parts) {
                         return (
@@ -1021,16 +1037,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Trạng thái & Giao việc</h4>
                   <div className="space-y-4">
                     <div>
-                      <p className="text-xs text-slate-500 mb-2">Trạng thái hiện tại</p>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium border border-emerald-100">
-                          {selectedLead.status}
-                        </span>
-                        {selectedLead.subStatus && (
-                          <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-100">
-                            {selectedLead.subStatus}
-                          </span>
-                        )}
+                      <p className="text-xs text-slate-500 mb-2">Người tạo và thời gian tạo</p>
+                      <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
+                          {selectedLead.creatorEmail ? selectedLead.creatorEmail[0].toUpperCase() : '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {selectedLead.creatorEmail}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {new Date(selectedLead.createdAt).toLocaleString('vi-VN')}
+                          </p>
+                        </div>
                       </div>
                     </div>
                     <div>
