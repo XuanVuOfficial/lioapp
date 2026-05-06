@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3 } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
-import { createLead, updateLead, assignLead } from '../services/leadService';
+import { createLead, updateLead, assignLead, deleteLead } from '../services/leadService';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -255,6 +255,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const handleAssign = async (lead: Lead, staffEmail?: string, deptId?: string) => {
     await assignLead(lead.id, staffEmail, deptId, user.email);
     setShowAssignModal(null);
+  };
+
+  const handleDeleteLead = async (lead: Lead) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xoá khách hàng "${lead.customerName}" không?`)) {
+      await deleteLead(lead.id);
+      setActionMenuOpenId(null);
+      if (selectedLead?.id === lead.id) {
+        setSelectedLead(null);
+      }
+    }
   };
 
   const getSubDepartments = (parentId: string) => {
@@ -615,16 +625,27 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenuOpenId(null); }} />
                             <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 py-1" onClick={e => e.stopPropagation()}>
                               {['tgd', 'admin'].includes(user.role) ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActionMenuOpenId(null);
-                                    setLeadToEdit(lead);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                >
-                                  <Edit2 className="w-4 h-4" /> Sửa thông tin
-                                </button>
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActionMenuOpenId(null);
+                                      setLeadToEdit(lead);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                  >
+                                    <Edit2 className="w-4 h-4" /> Sửa thông tin
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteLead(lead);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <Trash2 className="w-4 h-4" /> Xoá khách hàng
+                                  </button>
+                                </>
                               ) : (
                                 <div className="px-4 py-2 text-sm text-slate-500 italic">Không có hành động</div>
                               )}

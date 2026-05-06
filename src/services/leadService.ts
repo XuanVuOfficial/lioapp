@@ -95,6 +95,15 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   }
 };
 
+export const deleteLead = async (id: string): Promise<void> => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${COLLECTION}/${id}`);
+  }
+};
+
 export const subscribeToLeads = (role: UserRole, email: string, departmentIds: string[] | undefined, callback: (leads: Lead[]) => void) => {
   let q = query(collection(db, COLLECTION), orderBy('updatedAt', 'desc'));
 
