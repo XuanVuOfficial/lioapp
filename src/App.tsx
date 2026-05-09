@@ -186,6 +186,7 @@ export default function App() {
         setActiveTab={setActiveTab} 
         onLogout={handleLogout}
         settings={settings}
+        departments={departments}
       >
         {renderContent()}
       </Layout>

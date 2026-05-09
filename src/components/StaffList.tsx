@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check, Lock, Info } from 'lucide-react';
+import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check, Lock, Info, Upload } from 'lucide-react';
 import { UserProfile, Department, UserRole } from '../types';
 import { createStaffAccount, updateUserRole, deleteUser, updateUserProfile } from '../services/userService';
 import { updateDepartment } from '../services/departmentService';
@@ -23,7 +23,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     displayName: '',
     password: '',
     role: 'staff' as UserRole,
-    departmentId: ''
+    departmentId: '',
+    avatarUrl: ''
   });
 
   const filteredUsers = users.filter(u => 
@@ -40,6 +41,25 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const roomsEdit = departments.filter(d => d.level === 3 && (selectedFloorIdEdit ? d.parentId === selectedFloorIdEdit : true));
   const adminDepts = departments.filter(d => d.level === 1);
   const tgdDepts = departments.filter(d => d.level === 0);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Vui lòng chọn ảnh nhỏ hơn 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (isEdit) {
+          setEditingUser(prev => prev ? ({ ...prev, avatarUrl: reader.result as string }) : null);
+        } else {
+          setNewUser(prev => ({ ...prev, avatarUrl: reader.result as string }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newUser.email || !newUser.displayName || !newUser.password) {
@@ -83,7 +103,9 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         departmentId: newUser.departmentId || undefined,
         createdAt: Date.now(),
         createdBy: currentUser.email,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        avatarUrl: newUser.avatarUrl || undefined,
+        mustChangePassword: true
       }, newUser.password);
       
       // If a management role was assigned, update the department's manager info
@@ -95,7 +117,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       }
 
       setShowAddModal(false);
-      setNewUser({ email: '', displayName: '', password: '', role: 'staff', departmentId: '' });
+      setNewUser({ email: '', displayName: '', password: '', role: 'staff', departmentId: '', avatarUrl: '' });
       setSelectedFloorId('');
     } catch (error: any) {
       alert('Lỗi khi tạo tài khoản: ' + error.message);
@@ -132,10 +154,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         displayName: editingUser.displayName,
         role: editingUser.role,
         departmentId: editingUser.departmentId || undefined,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        avatarUrl: editingUser.avatarUrl || undefined
       };
       if (editingUser.password) {
         updates.password = editingUser.password;
+        updates.mustChangePassword = true;
       }
       
       await updateUserProfile(editingUser.uid, updates);
@@ -250,7 +274,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       displayName: '',
       password: '',
       role: 'staff' as UserRole,
-      departmentId: currentUser.role === 'tp' ? (currentUser.departmentId || '') : ''
+      departmentId: currentUser.role === 'tp' ? (currentUser.departmentId || '') : '',
+      avatarUrl: ''
     });
     setShowAddModal(true);
   };
@@ -312,8 +337,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 <tr key={user.uid} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
-                        {user.displayName[0].toUpperCase()}
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold overflow-hidden shrink-0">
+                        {user.avatarUrl ? (
+                          <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          user.displayName[0]?.toUpperCase() || 'U'
+                        )}
                       </div>
                       <div>
                         <p className="font-semibold text-slate-900">{user.displayName}</p>
@@ -379,8 +408,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
             <div key={user.uid} className="p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold shrink-0">
-                    {user.displayName[0].toUpperCase()}
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold shrink-0 overflow-hidden">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      user.displayName[0]?.toUpperCase() || 'U'
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-900 truncate">{user.displayName}</p>
@@ -457,6 +490,21 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
               </div>
               
               <div className="space-y-4">
+                <div className="flex justify-center mb-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                      {newUser.avatarUrl ? (
+                        <img src={newUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <User className="w-10 h-10 text-slate-300" />
+                      )}
+                    </div>
+                    <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-all border-2 border-white">
+                      <Upload className="w-4 h-4" />
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, false)} />
+                    </label>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên</label>
                   <input 
@@ -631,6 +679,21 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
               </div>
               
               <div className="space-y-4">
+                <div className="flex justify-center mb-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                      {editingUser.avatarUrl ? (
+                        <img src={editingUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <User className="w-10 h-10 text-slate-300" />
+                      )}
+                    </div>
+                    <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-all border-2 border-white">
+                      <Upload className="w-4 h-4" />
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, true)} />
+                    </label>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                   <p className="text-slate-500 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">{editingUser.email}</p>
@@ -794,6 +857,18 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 </button>
               </div>
               
+              <div className="flex flex-col items-center mb-6 text-center">
+                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold overflow-hidden shrink-0 border-4 border-white shadow-md mb-3">
+                  {infoUser.avatarUrl ? (
+                    <img src={infoUser.avatarUrl} alt={infoUser.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="text-2xl">{infoUser.displayName[0]?.toUpperCase() || 'U'}</span>
+                  )}
+                </div>
+                <h4 className="font-bold text-lg text-slate-900">{infoUser.displayName}</h4>
+                <p className="text-sm text-slate-500">{infoUser.email}</p>
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Ngày tạo</p>

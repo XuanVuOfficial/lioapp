@@ -1,8 +1,9 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save } from 'lucide-react';
 import { UserProfile } from '../types';
 import { AppSettings } from '../services/settingsService';
+import { updateUserProfile } from '../services/userService';
 
 interface LayoutProps {
   user: UserProfile | null;
@@ -11,10 +12,14 @@ interface LayoutProps {
   setActiveTab: (tab: string) => void;
   onLogout: () => void;
   settings: AppSettings | null;
+  departments: Department[];
 }
 
-export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setActiveTab, onLogout, settings }) => {
+export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setActiveTab, onLogout, settings, departments }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = React.useState(false);
+  const [editingProfile, setEditingProfile] = React.useState<{ password?: string; avatarUrl?: string }>({});
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
@@ -30,6 +35,78 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
     const allowedTabs = settings.tabVisibility[user.role] || [];
     return navItems.filter(item => allowedTabs.includes(item.id));
   }, [user, settings]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Vui lòng chọn ảnh nhỏ hơn 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditingProfile(prev => ({ ...prev, avatarUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    setIsSaving(true);
+    try {
+      const updates: any = {};
+      if (editingProfile.password) {
+        if (editingProfile.password.length < 5) {
+          alert('Mật khẩu phải có ít nhất 5 ký tự.');
+          setIsSaving(false);
+          return;
+        }
+        updates.password = editingProfile.password;
+        updates.mustChangePassword = false;
+      }
+      if (editingProfile.avatarUrl) {
+        updates.avatarUrl = editingProfile.avatarUrl;
+        user.avatarUrl = editingProfile.avatarUrl; // Optimistic update
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await updateUserProfile(user.uid, updates);
+        alert('Cập nhật thông tin thành công!');
+        setIsEditProfileOpen(false);
+        setEditingProfile({});
+      } else {
+        setIsEditProfileOpen(false);
+      }
+    } catch (error: any) {
+      alert('Lỗi khi cập nhật: ' + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getRoleDisplay = (role?: string) => {
+    switch (role) {
+      case 'tgd': return 'Tổng giám đốc';
+      case 'admin': return 'Admin';
+      case 'gds': return 'Giám đốc sàn';
+      case 'tp': return 'Trưởng phòng / Quản lý';
+      default: return 'Nhân viên';
+    }
+  };
+
+  const getDepartmentPath = (deptId?: string): string => {
+    if (!deptId) return 'Chưa phân bổ phòng ban';
+    const path: string[] = [];
+    let currentDept = departments.find(d => d.id === deptId);
+    while (currentDept) {
+      path.unshift(currentDept.name);
+      currentDept = departments.find(d => d.id === currentDept?.parentId);
+    }
+    return path.join(' > ');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -78,18 +155,36 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
           </nav>
 
           <div className="mt-auto pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-3 px-3 py-2 mb-4">
-              <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-slate-600" />
+            <div className="flex items-center gap-3 px-3 py-2 mb-2">
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center shrink-0 border border-slate-200 overflow-hidden">
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <User className="w-5 h-5 text-slate-400" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 truncate">{user?.displayName}</p>
-                <p className="text-xs text-slate-500 truncate capitalize">
-                  {user?.role === 'admin' ? 'Admin' : 
-                   user?.role === 'tp' ? 'Trưởng phòng' : 'Nhân viên'}
+                <p className="text-xs text-slate-500 truncate mb-1">{user?.email}</p>
+                <p className="text-xs text-emerald-600 font-medium truncate">
+                  {getRoleDisplay(user?.role)}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5 whitespace-normal break-words leading-tight">
+                  {getDepartmentPath(user?.departmentId)}
                 </p>
               </div>
             </div>
+            
+            <button
+              onClick={() => {
+                setEditingProfile({ avatarUrl: user?.avatarUrl });
+                setIsEditProfileOpen(true);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors mb-1"
+            >
+              <Edit2 className="w-4 h-4" />
+              Sửa thông tin
+            </button>
             <button
               onClick={onLogout}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors mb-2"
@@ -148,6 +243,95 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
           </button>
         ))}
       </nav>
+
+      {/* Edit Profile Modal */}
+      <AnimatePresence>
+        {isEditProfileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditProfileOpen(false)}
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-white rounded-2xl shadow-xl z-[70] overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+                <h3 className="text-lg font-bold text-slate-900">Sửa thông tin cá nhân</h3>
+                <button
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-6 overflow-y-auto">
+                <form id="editProfileForm" onSubmit={handleSaveProfile} className="space-y-6">
+                  <div className="flex justify-center mb-6">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                        {editingProfile.avatarUrl ? (
+                          <img src={editingProfile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <User className="w-10 h-10 text-slate-300" />
+                        )}
+                      </div>
+                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-all border-2 border-white">
+                        <Upload className="w-4 h-4" />
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu mới</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <input
+                        type="password"
+                        value={editingProfile.password || ''}
+                        onChange={(e) => setEditingProfile({ ...editingProfile, password: e.target.value })}
+                        className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                        placeholder="Để trống nếu không muốn đổi"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">Sẽ tự động yêu cầu đổi mật khẩu khi đăng nhập lại nếu bạn là người quản lý cấp tài khoản.</p>
+                  </div>
+                </form>
+              </div>
+
+              <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  form="editProfileForm"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Lưu thay đổi
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

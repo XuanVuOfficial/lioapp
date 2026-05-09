@@ -11,6 +11,8 @@ export interface UserProfile {
   createdAt?: number;
   createdBy?: string;
   updatedAt?: number;
+  avatarUrl?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface Department {
