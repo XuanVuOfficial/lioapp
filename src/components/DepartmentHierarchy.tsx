@@ -221,7 +221,7 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
                             return;
                           }
                           if (window.confirm('Bạn có chắc chắn muốn xóa phòng ban này?')) {
-                            deleteDepartment(node.id);
+                            deleteDepartment(node);
                           }
                         }}
                         className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"

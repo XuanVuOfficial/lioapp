@@ -1,4 +1,4 @@
-import { queryDB, escapeSQL, subscribeDB } from '../api';
+import { queryDB, escapeSQL, subscribeDB, executeMutation } from '../api';
 
 const DOC_ID = 'app_settings';
 
@@ -59,9 +59,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 };
 
 export const updateAppSettings = async (settings: AppSettings): Promise<void> => {
-  try {
-    await queryDB(`INSERT INTO settings (id, tabVisibility, roleLimits) VALUES (${escapeSQL(DOC_ID)}, ${escapeSQL(settings.tabVisibility)}, ${escapeSQL(settings.roleLimits)}) ON DUPLICATE KEY UPDATE tabVisibility = VALUES(tabVisibility), roleLimits = VALUES(roleLimits)`);
-  } catch(e) { console.error('updateAppSettings error', e); }
+  await executeMutation('settings', 'UPDATE', settings, `INSERT INTO settings (id, tabVisibility, roleLimits) VALUES (${escapeSQL(DOC_ID)}, ${escapeSQL(settings.tabVisibility)}, ${escapeSQL(settings.roleLimits)}) ON DUPLICATE KEY UPDATE tabVisibility = VALUES(tabVisibility), roleLimits = VALUES(roleLimits)`);
 };
 
 export const subscribeToSettings = (callback: (settings: AppSettings) => void) => {

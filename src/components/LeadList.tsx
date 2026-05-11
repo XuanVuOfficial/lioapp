@@ -263,7 +263,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const handleDeleteLead = async (lead: Lead) => {
     if (window.confirm(`Bạn có chắc chắn muốn xoá khách hàng "${lead.customerName}" không?`)) {
-      await deleteLead(lead.id);
+      await deleteLead(lead);
       setActionMenuOpenId(null);
       if (selectedLead?.id === lead.id) {
         setSelectedLead(null);

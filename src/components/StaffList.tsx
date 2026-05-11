@@ -386,7 +386,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                         <button 
                           onClick={() => {
                             if (window.confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
-                              deleteUser(user.uid);
+                              deleteUser(user);
                             }
                           }}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -440,7 +440,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     <button 
                       onClick={() => {
                         if (window.confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
-                          deleteUser(user.uid);
+                          deleteUser(user);
                         }
                       }}
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"

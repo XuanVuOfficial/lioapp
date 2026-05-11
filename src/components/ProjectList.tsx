@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Project, UserProfile, Lead } from '../types';
-import { queryDB, escapeSQL, subscribeDB, generateId } from '../api';
+import { queryDB, escapeSQL, subscribeDB, generateId, executeMutation, subscribeToMutations } from '../api';
 import { Plus, Trash2, FolderKanban, Users, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ProjectListProps {
@@ -22,41 +22,50 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
       setLoading(false);
     }, 5000);
 
-    return () => unsubscribe();
+    const unsubMutations = subscribeToMutations((event) => {
+       if (event.entity === 'projects') {
+         if (event.type === 'CREATE') {
+           setProjects(prev => [event.data, ...prev]);
+         } else if (event.type === 'DELETE') {
+           if (event.data.rollback) {
+              setProjects(prev => [event.data.originalData, ...prev]);
+           } else {
+              setProjects(prev => prev.filter(p => p.id !== event.data.id));
+           }
+         }
+       }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubMutations();
+    };
   }, [user]);
 
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newAbbreviation.trim()) return;
 
-    try {
-      const newProj = {
-        id: generateId(),
-        name: newName.trim(),
-        abbreviation: newAbbreviation.trim().toLowerCase(),
-        createdAt: new Date().toISOString(),
-        createdByEmail: user.email
-      };
-      const cols = Object.keys(newProj).join(', ');
-      const vals = Object.values(newProj).map(v => escapeSQL(v)).join(', ');
-      
-      await queryDB(`INSERT INTO projects (${cols}) VALUES (${vals})`);
-      
-      setNewName('');
-      setNewAbbreviation('');
-      setIsAdding(false);
-    } catch (error) {
-      console.error('Error adding project:', error);
-    }
+    const newProj: Project = {
+      id: generateId(),
+      name: newName.trim(),
+      abbreviation: newAbbreviation.trim().toLowerCase(),
+      createdAt: new Date().toISOString(),
+      createdByEmail: user.email
+    };
+    const cols = Object.keys(newProj).join(', ');
+    const vals = Object.values(newProj).map(v => escapeSQL(v)).join(', ');
+    
+    await executeMutation('projects', 'CREATE', newProj, `INSERT INTO projects (${cols}) VALUES (${vals})`);
+    
+    setNewName('');
+    setNewAbbreviation('');
+    setIsAdding(false);
   };
 
-  const handleDeleteProject = async (id: string) => {
+  const handleDeleteProject = async (project: Project) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa dự án này?')) return;
-    try {
-      await queryDB(`DELETE FROM projects WHERE id = ${escapeSQL(id)} LIMIT 1`);
-    } catch (error) {
-      console.error('Error deleting project:', error);
-    }
+    await executeMutation('projects', 'DELETE', project, `DELETE FROM projects WHERE id = ${escapeSQL(project.id)} LIMIT 1`);
   };
 
   if (loading) {
@@ -154,7 +163,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteProject(project.id);
+                      handleDeleteProject(project);
                     }}
                     className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
                   >

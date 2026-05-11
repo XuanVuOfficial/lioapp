@@ -4,6 +4,7 @@ import { getUserProfile, createUserProfile, subscribeToUsersByDepartment, getUse
 import { subscribeToDepartments } from './services/departmentService';
 import { subscribeToLeads } from './services/leadService';
 import { Layout } from './components/Layout';
+import { subscribeToMutations } from './api';
 import { Auth } from './components/Auth';
 import { Dashboard } from './components/Dashboard';
 import { DepartmentHierarchy } from './components/DepartmentHierarchy';
@@ -116,6 +117,49 @@ export default function App() {
 
     const unsubLeads = subscribeToLeads(effectiveUser.role, effectiveUser.email, allowedDeptIds, setLeads);
 
+    const unsubMutations = subscribeToMutations((event) => {
+      // Handle optimistic updates for each entity type
+      if (event.entity === 'leads') {
+        if (event.type === 'CREATE') {
+          setLeads(prev => [event.data, ...prev]);
+        } else if (event.type === 'UPDATE') {
+          setLeads(prev => prev.map(l => l.id === event.data.id ? { ...l, ...event.data } : l));
+        } else if (event.type === 'DELETE') {
+          if (event.data.rollback) {
+            // Revert state on error
+            if (event.data.originalType === 'CREATE') {
+              setLeads(prev => prev.filter(l => l.id !== event.data.originalData.id));
+            } else if (event.data.originalType === 'UPDATE') {
+              // Wait for next subscribe cycle or implement complex rollback
+              // Polling will naturally fix updates, but for CREATE/DELETE we need manual fix
+            } else if (event.data.originalType === 'DELETE') {
+               setLeads(prev => [event.data.originalData, ...prev]);
+            }
+          } else {
+            setLeads(prev => prev.filter(l => l.id !== event.data.id));
+          }
+        }
+      } else if (event.entity === 'departments') {
+         if (event.type === 'UPDATE') {
+           setDepartments(prev => prev.map(d => d.id === event.data.id ? { ...d, ...event.data } : d));
+         }
+      } else if (event.entity === 'users') {
+        if (event.type === 'UPDATE') {
+          setStaff(prev => prev.map(s => s.uid === event.data.uid ? { ...s, ...event.data } : s));
+        } else if (event.type === 'DELETE') {
+          if (event.data.rollback) {
+             setStaff(prev => [event.data.originalData, ...prev]);
+          } else {
+             setStaff(prev => prev.filter(s => s.uid !== event.data.id));
+          }
+        }
+      } else if (event.entity === 'settings') {
+        if (event.type === 'UPDATE') {
+          setSettings(event.data);
+        }
+      }
+    });
+
     let unsubStaff: () => void = () => {};
     if (['tgd', 'admin', 'gds', 'tp'].includes(effectiveUser.role)) {
       unsubStaff = subscribeToAllUsers(setStaff);
@@ -124,6 +168,7 @@ export default function App() {
     return () => {
       unsubLeads();
       unsubStaff();
+      unsubMutations();
     };
   }, [effectiveUser, departments]);
 

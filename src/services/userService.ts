@@ -1,4 +1,4 @@
-import { queryDB, escapeSQL, subscribeDB, generateId } from '../api';
+import { queryDB, escapeSQL, subscribeDB, generateId, executeMutation } from '../api';
 import { UserProfile, UserRole } from '../types';
 
 const parseUser = (row: any): UserProfile => {
@@ -45,45 +45,34 @@ export const verifyCredentials = async (email: string, pass: string): Promise<Us
 };
 
 export const createUserProfile = async (profile: UserProfile): Promise<void> => {
-  try {
-    const cols = Object.keys(profile).join(', ');
-    const vals = Object.values(profile).map(v => escapeSQL(v)).join(', ');
-    await queryDB(`INSERT INTO users (${cols}) VALUES (${vals})`);
-  } catch(e) { console.error('createUserProfile error', e); }
+  const cols = Object.keys(profile).join(', ');
+  const vals = Object.values(profile).map(v => escapeSQL(v)).join(', ');
+  await executeMutation('users', 'CREATE', profile, `INSERT INTO users (${cols}) VALUES (${vals})`);
 };
 
 export const createStaffAccount = async (profile: Omit<UserProfile, 'uid'>, password: string): Promise<void> => {
-  try {
-    const uid = 'user_' + generateId();
-    await createUserProfile({
-      ...profile,
-      uid,
-      password
-    });
-  } catch (error) {
-    console.error('Error creating staff account:', error);
-    throw error;
-  }
+  const uid = 'user_' + generateId();
+  await createUserProfile({
+    ...profile,
+    uid,
+    password
+  });
 };
 
 export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>): Promise<void> => {
-  try {
-    const setClause = Object.entries(updates).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
-    if (setClause) {
-      await queryDB(`UPDATE users SET ${setClause} WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
-    }
-  } catch(e) { console.error('updateUserProfile error', e); }
+  const setClause = Object.entries(updates).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+  if (setClause) {
+    await executeMutation('users', 'UPDATE', { uid, ...updates }, `UPDATE users SET ${setClause} WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
+  }
 };
 
 export const updateUserRole = async (uid: string, role: UserRole, departmentId?: string): Promise<void> => {
-  try {
-    const updates: any = { role };
-    if (departmentId !== undefined) updates.departmentId = departmentId;
-    else updates.departmentId = null;
-    
-    const setClause = Object.entries(updates).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
-    await queryDB(`UPDATE users SET ${setClause} WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
-  } catch(e) { console.error('updateUserRole error', e); }
+  const updates: any = { role };
+  if (departmentId !== undefined) updates.departmentId = departmentId;
+  else updates.departmentId = null;
+  
+  const setClause = Object.entries(updates).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+  await executeMutation('users', 'UPDATE', { uid, ...updates }, `UPDATE users SET ${setClause} WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
 };
 
 export const subscribeToUsersByDepartment = (departmentId: string, callback: (users: UserProfile[]) => void) => {
@@ -98,8 +87,6 @@ export const subscribeToAllUsers = (callback: (users: UserProfile[]) => void) =>
   }, 5000);
 };
 
-export const deleteUser = async (uid: string): Promise<void> => {
-  try {
-    await queryDB(`DELETE FROM users WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
-  } catch(e) { console.error('deleteUser error', e); }
+export const deleteUser = async (user: UserProfile): Promise<void> => {
+  await executeMutation('users', 'DELETE', user, `DELETE FROM users WHERE uid = ${escapeSQL(user.uid)} LIMIT 1`);
 };
