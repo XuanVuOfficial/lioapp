@@ -219,8 +219,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     }
 
     const history = [];
-    if (newLead.details) {
-      history.push(`[${new Date().toLocaleString()}] ${user.displayName || user.email}: ${newLead.details}`);
+    if (newLead.notes) {
+      history.push(`[NOTE][${new Date().toLocaleString()}] ${user.displayName || user.email}: ${newLead.notes}`);
     }
 
     // If staff creates a lead, assign it to them by default if not specified
@@ -234,8 +234,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       subStatus: newLead.subStatus,
       appointmentStatus: newLead.appointmentStatus,
       resultStatus: newLead.resultStatus,
-      details: '', // Clear details as we use history now
-      notes: newLead.notes,
+      details: '',
+      notes: newLead.notes || '',
       departmentId: finalDepartmentId,
       projectId: newLead.projectId,
       customerCode: customerCode,
@@ -755,8 +755,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <label className="block text-sm font-medium text-slate-700 mb-1">Ghi chú ban đầu</label>
               <textarea 
                 rows={3}
-                value={newLead.details}
-                onChange={e => setNewLead(prev => ({ ...prev, details: e.target.value }))}
+                value={newLead.notes}
+                onChange={e => setNewLead(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Nhập ghi chú ban đầu cho khách hàng..."
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
               />
@@ -938,7 +938,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   }
                   const timestamp = new Date().toLocaleString('vi-VN');
                   const username = user.displayName || user.email;
-                  const entry = `[${timestamp}] ${username}: cập nhật thông tin (Tên: ${leadToEdit.customerName}, SĐT: ${leadToEdit.phone})`;
+                  const entry = `[LOG][${timestamp}] ${username}: cập nhật thông tin (Tên: ${leadToEdit.customerName}, SĐT: ${leadToEdit.phone})`;
                   const updatedHistory = [...(leadToEdit.history || []), entry];
                   await updateLead(leadToEdit.id, { 
                     customerName: leadToEdit.customerName, 
@@ -1019,22 +1019,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                       </a>
                     </div>
                   </div>
-                  {selectedLead.notes && (
-                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
-                      <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mb-1">Ghi chú ban đầu</p>
-                      <p className="text-sm text-slate-700 leading-relaxed">{selectedLead.notes}</p>
-                    </div>
-                  )}
                 </section>
 
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Cập nhật thông tin</h4>
                   {(()=>{
                     const isRoleAllowedToEditStatus = ['tgd', 'admin', 'gds'].includes(user.role);
-                    const isStatusDisabled = !isRoleAllowedToEditStatus && selectedLead.status !== 'Chưa liên hệ';
-                    const isSubStatusDisabled = !isRoleAllowedToEditStatus && !!selectedLead.subStatus;
-                    const isAppointmentStatusDisabled = !isRoleAllowedToEditStatus && !!selectedLead.appointmentStatus;
-                    const isResultStatusDisabled = !isRoleAllowedToEditStatus && !!selectedLead.resultStatus;
+                    const isStatusDisabled = false;
+                    const isSubStatusDisabled = false;
+                    const isAppointmentStatusDisabled = false;
+                    const isResultStatusDisabled = false;
                     
                     return (
                       <>
@@ -1054,7 +1048,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                                 };
                                 const timestamp = new Date().toLocaleString('vi-VN');
                                 const username = user.displayName || user.email;
-                                const entry = `[${timestamp}] ${username}: cập nhật Trạng thái là '${status}'`;
+                                const entry = `[LOG][${timestamp}] ${username}: cập nhật Trạng thái là '${status}'`;
                                 const updatedHistory = [...(selectedLead.history || []), entry];
                                 await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
                                 setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
@@ -1084,7 +1078,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                                   const timestamp = new Date().toLocaleString('vi-VN');
                                   const username = user.displayName || user.email;
                                   const actionText = subStatus ? `cập nhật Trạng thái là '${selectedLead.status} > ${subStatus}'` : `đã xóa Trạng thái chi tiết (trước đó là '${selectedLead.subStatus}')`;
-                                  const entry = `[${timestamp}] ${username}: ${actionText}`;
+                                  const entry = `[LOG][${timestamp}] ${username}: ${actionText}`;
                                   const updatedHistory = [...(selectedLead.history || []), entry];
                                   await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
                                   setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
@@ -1114,7 +1108,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                                   const timestamp = new Date().toLocaleString('vi-VN');
                                   const username = user.displayName || user.email;
                                   const actionText = appointmentStatus ? `cập nhật Hẹn khách là '${appointmentStatus}'` : `đã xóa Hẹn khách (trước đó là '${selectedLead.appointmentStatus}')`;
-                                  const entry = `[${timestamp}] ${username}: ${actionText}`;
+                                  const entry = `[LOG][${timestamp}] ${username}: ${actionText}`;
                                   const updatedHistory = [...(selectedLead.history || []), entry];
                                   await updateLead(selectedLead.id, { appointmentStatus, history: updatedHistory }, user.email);
                                   setSelectedLead({ ...selectedLead, appointmentStatus, history: updatedHistory });
@@ -1140,7 +1134,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                                     const timestamp = new Date().toLocaleString('vi-VN');
                                     const username = user.displayName || user.email;
                                     const actionText = resultStatus ? `cập nhật Kết quả là '${resultStatus}'` : `đã xóa Kết quả (trước đó là '${selectedLead.resultStatus}')`;
-                                    const entry = `[${timestamp}] ${username}: ${actionText}`;
+                                    const entry = `[LOG][${timestamp}] ${username}: ${actionText}`;
                                     const updatedHistory = [...(selectedLead.history || []), entry];
                                     await updateLead(selectedLead.id, { resultStatus, history: updatedHistory }, user.email);
                                     setSelectedLead({ ...selectedLead, resultStatus, history: updatedHistory });
@@ -1173,7 +1167,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             if (e.key === 'Enter' && newNote.trim()) {
                               const timestamp = new Date().toLocaleString('vi-VN');
                               const username = user.displayName || user.email;
-                              const entry = `[${timestamp}] ${username}: ${newNote.trim()}`;
+                              const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
                               const updatedHistory = [...(selectedLead.history || []), entry];
                               await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
                               setSelectedLead({ ...selectedLead, history: updatedHistory });
@@ -1188,7 +1182,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             if (!newNote.trim()) return;
                             const timestamp = new Date().toLocaleString('vi-VN');
                             const username = user.displayName || user.email;
-                            const entry = `[${timestamp}] ${username}: ${newNote.trim()}`;
+                            const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
                             const updatedHistory = [...(selectedLead.history || []), entry];
                             await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
                             setSelectedLead({ ...selectedLead, history: updatedHistory });
@@ -1209,26 +1203,49 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </h4>
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                     {(selectedLead.history || []).slice().reverse().map((entry, i) => {
-                      const parts = entry.match(/^\[(.*?)\] (.*?): (.*)$/);
+                      const isNote = entry.startsWith('[NOTE]');
+                      const isLog = entry.startsWith('[LOG]');
+                      const cleanEntry = entry.replace(/^\[(NOTE|LOG)\]/, '');
+                      
+                      const parts = cleanEntry.match(/^\[(.*?)\] (.*?): (.*)$/);
                       if (parts) {
                         return (
-                          <div key={i} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <div key={i} className={`p-3 rounded-xl border ${isNote ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
                             <div className="flex justify-between items-start mb-1">
-                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{parts[2]}</span>
+                              <div className="flex items-center gap-1.5">
+                                {isNote ? (
+                                  <Edit2 className="w-3 h-3 text-amber-600" />
+                                ) : (
+                                  <History className="w-3 h-3 text-emerald-600" />
+                                )}
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${isNote ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  {parts[2]}
+                                </span>
+                              </div>
                               <span className="text-[10px] text-slate-400">{parts[1]}</span>
                             </div>
-                            <p className="text-sm text-slate-700 leading-relaxed">{parts[3]}</p>
+                            <p className="text-sm text-slate-700 leading-relaxed italic">{isNote ? parts[3] : parts[3]}</p>
                           </div>
                         );
                       }
                       return (
                         <div key={i} className="flex gap-3 text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <History className="w-4 h-4 text-slate-400 shrink-0" />
                           <p className="text-slate-600">{entry}</p>
                         </div>
                       );
                     })}
                   </div>
                 </section>
+
+                {selectedLead.notes && (
+                  <section>
+                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Ghi chú ban đầu</h4>
+                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLead.notes}</p>
+                    </div>
+                  </section>
+                )}
               </div>
 
               <div className="space-y-6">

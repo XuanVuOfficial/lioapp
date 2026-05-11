@@ -22,7 +22,10 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
     createdAt: now,
     updatedAt: now,
     assignedByEmail: lead.assignedToEmail ? lead.creatorEmail : undefined,
-    history: [`Được tạo bởi ${lead.creatorEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`]
+    history: [
+      `[LOG] Được tạo bởi ${lead.creatorEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`,
+      ...(lead.history || [])
+    ]
   };
   
   const data = Object.fromEntries(
@@ -45,7 +48,7 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
     if (data && data.length > 0 && data[0].history) {
       try { currentHistory = typeof data[0].history === 'string' ? JSON.parse(data[0].history) : data[0].history; } catch(e){}
     }
-    const historyEntry = `Cập nhật bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
+    const historyEntry = `[LOG] Cập nhật bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
     if (!Array.isArray(currentHistory)) currentHistory = [];
     newHistory = [...currentHistory, historyEntry];
   }
@@ -71,7 +74,7 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
     try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch(e){}
   }
   
-  let historyEntry = `Giao việc bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
+  let historyEntry = `[LOG] Giao việc bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
   if (assignedToEmail) historyEntry += ` cho ${assignedToEmail}`;
   if (departmentId) historyEntry += ` cho phòng ban ID ${departmentId}`;
   if (!Array.isArray(currentHistory)) currentHistory = [];

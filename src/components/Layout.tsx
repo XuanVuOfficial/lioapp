@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save, Copy } from 'lucide-react';
 import { UserProfile, Department } from '../types';
 import { AppSettings } from '../services/settingsService';
 import { updateUserProfile } from '../services/userService';
@@ -194,7 +194,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
             
             <button
               onClick={() => {
-                setEditingProfile({ avatarUrl: user?.avatarUrl });
+                setEditingProfile({ avatarUrl: user?.avatarUrl, password: user?.password });
                 setIsEditProfileOpen(true);
               }}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors mb-1"
@@ -211,7 +211,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
             </button>
             <div className="px-3 py-1">
               <p className="text-[10px] text-slate-400 font-mono">
-                v{(window as any).__APP_VERSION__ || '0.0.0'}
+                v1.1.0
               </p>
             </div>
           </div>
@@ -307,16 +307,29 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu mới</label>
-                    <div className="relative">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
+                    <div className="relative group/copy">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                       <input
-                        type="password"
+                        type="text"
                         value={editingProfile.password || ''}
                         onChange={(e) => setEditingProfile({ ...editingProfile, password: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                        placeholder="Để trống nếu không muốn đổi"
+                        className="w-full pl-10 pr-12 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-mono"
+                        placeholder="Mật khẩu của bạn"
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editingProfile.password) {
+                            navigator.clipboard.writeText(editingProfile.password);
+                            alert('Đã sao chép mật khẩu!');
+                          }
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                        title="Sao chép mật khẩu"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">Sẽ tự động yêu cầu đổi mật khẩu khi đăng nhập lại nếu bạn là người quản lý cấp tài khoản.</p>
                   </div>

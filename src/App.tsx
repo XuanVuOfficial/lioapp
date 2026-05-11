@@ -62,6 +62,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('salespro_uid');
     setUser(null);
+    setActiveTab('dashboard');
   };
 
   useEffect(() => {

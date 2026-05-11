@@ -228,15 +228,6 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
             </button>
           </form>
         )}
-
-        {!requirePasswordChange && (
-          <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
-            <p className="text-xs text-slate-500 font-medium mb-1">Tài khoản mặc định:</p>
-            <p className="text-xs text-slate-400">Tên đăng nhập: <span className="text-slate-600 font-mono">admin</span></p>
-            <p className="text-xs text-slate-400">Email: <span className="text-slate-600 font-mono">Tongsan@gmail.com</span></p>
-            <p className="text-xs text-slate-400">Mật khẩu: <span className="text-slate-600 font-mono">12345</span></p>
-          </div>
-        )}
       </motion.div>
     </div>
   );
