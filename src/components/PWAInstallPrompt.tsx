@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Share, PlusSquare, X, Smartphone } from 'lucide-react';
 
+const SHOW_PWA_PROMPT: number = 0; // 1 bật, 0 tắt
+
 export const PWAInstallPrompt: React.FC = () => {
   const [showPrompt, setShowPrompt] = useState(false);
   const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    if (SHOW_PWA_PROMPT === 0) return;
+
     // Detect platform
     const ua = navigator.userAgent.toLowerCase();
     const isAndroid = /android/.test(ua);

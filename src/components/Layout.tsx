@@ -32,7 +32,24 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
 
   const filteredNavItems = React.useMemo(() => {
     if (!user || !settings) return [];
-    const allowedTabs = settings.tabVisibility[user.role] || [];
+    
+    // 1. Try role-based mapping
+    let allowedTabs = settings.tabVisibility[user.role];
+    
+    // 2. Handle flat boolean map (legacy/manual SQL)
+    if (!allowedTabs) {
+      const isFlat = navItems.some(item => (settings.tabVisibility as any)[item.id] === true);
+      if (isFlat) {
+        return navItems.filter(item => (settings.tabVisibility as any)[item.id] === true);
+      }
+      allowedTabs = [];
+    }
+
+    // 3. Fallback for admin/tgd if nothing configured
+    if (allowedTabs.length === 0 && ['tgd', 'admin'].includes(user.role)) {
+      return navItems;
+    }
+    
     return navItems.filter(item => allowedTabs.includes(item.id));
   }, [user, settings]);
 

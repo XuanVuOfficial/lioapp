@@ -39,7 +39,20 @@ export const Settings: React.FC<Props> = ({ user }) => {
   const toggleTab = (role: string, tabId: string) => {
     if (!settings) return;
     
-    const currentTabs = settings.tabVisibility[role] || [];
+    // Convert flat format to role-based if needed before editing
+    let currentTabVisibility = { ...settings.tabVisibility };
+    if (typeof (currentTabVisibility as any).dashboard === 'boolean') {
+      const activeTabs = allTabs.filter(t => (currentTabVisibility as any)[t.id] === true).map(t => t.id);
+      currentTabVisibility = {
+        tgd: [...activeTabs],
+        admin: [...activeTabs],
+        gds: [...activeTabs],
+        tp: [...activeTabs],
+        staff: [...activeTabs]
+      };
+    }
+
+    const currentTabs = currentTabVisibility[role] || [];
     let newTabs: string[];
     
     if (currentTabs.includes(tabId)) {
@@ -53,7 +66,7 @@ export const Settings: React.FC<Props> = ({ user }) => {
     setSettings({
       ...settings,
       tabVisibility: {
-        ...settings.tabVisibility,
+        ...currentTabVisibility,
         [role]: newTabs
       }
     });
@@ -118,7 +131,11 @@ export const Settings: React.FC<Props> = ({ user }) => {
             <div className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {allTabs.map(tab => {
-                  const isVisible = settings.tabVisibility[role.id]?.includes(tab.id);
+                  let isVisible = settings.tabVisibility[role.id]?.includes(tab.id);
+                  if (isVisible === undefined && typeof (settings.tabVisibility as any).dashboard === 'boolean') {
+                    isVisible = (settings.tabVisibility as any)[tab.id] === true;
+                  }
+                  
                   const isRequired = role.id === 'admin' && (tab.id === 'dashboard' || tab.id === 'settings');
                   
                   return (

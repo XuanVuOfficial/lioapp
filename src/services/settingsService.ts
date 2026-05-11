@@ -15,7 +15,9 @@ export interface AppSettings {
 
 const DEFAULT_SETTINGS: AppSettings = {
   tabVisibility: {
+    tgd: ['dashboard', 'leads', 'projects', 'departments', 'staff', 'settings'],
     admin: ['dashboard', 'leads', 'projects', 'departments', 'staff', 'settings'],
+    gds: ['dashboard', 'leads', 'projects', 'departments', 'staff'],
     tp: ['dashboard', 'leads', 'projects', 'departments', 'staff'],
     staff: ['dashboard', 'leads']
   },
