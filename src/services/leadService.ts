@@ -1,42 +1,54 @@
-import { doc, setDoc, updateDoc, deleteDoc, collection, onSnapshot, query, where, orderBy, addDoc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../firebase';
-import { Lead, OperationType, UserRole } from '../types';
+import { queryDB, escapeSQL, subscribeDB, generateId } from '../api';
+import { Lead, UserRole } from '../types';
 
-const COLLECTION = 'leads';
+const parseLead = (row: any): Lead => {
+  const lead = { ...row };
+  if (lead.history) {
+    try {
+      lead.history = typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history;
+    } catch(e) { lead.history = []; }
+  } else {
+    lead.history = [];
+  }
+  return lead as Lead;
+};
 
 export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
   try {
-    const docRef = doc(collection(db, COLLECTION));
+    const id = generateId();
     const now = new Date().toISOString();
     const newLead: Lead = {
       ...lead,
-      id: docRef.id,
+      id,
       createdAt: now,
       updatedAt: now,
       assignedByEmail: lead.assignedToEmail ? lead.creatorEmail : undefined,
       history: [`Được tạo bởi ${lead.creatorEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`]
     };
-    // Remove undefined fields for Firestore
+    
     const data = Object.fromEntries(
       Object.entries(newLead).filter(([_, v]) => v !== undefined)
     );
-    await setDoc(docRef, data);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, COLLECTION);
-  }
+    
+    const cols = Object.keys(data).join(', ');
+    const vals = Object.values(data).map(v => escapeSQL(v)).join(', ');
+    await queryDB(`INSERT INTO leads (${cols}) VALUES (${vals})`);
+  } catch(e) { console.error('createLead error', e); }
 };
 
 export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: string): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, id);
     const now = new Date().toISOString();
-    
-    // Get current lead to append to history if not provided in updates
     let newHistory = updates.history;
+    
     if (!newHistory) {
-      const docSnap = await getDoc(docRef);
-      const currentHistory = docSnap.exists() ? (docSnap.data() as Lead).history : [];
+      const data = await queryDB(`SELECT history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+      let currentHistory: string[] = [];
+      if (data && data.length > 0 && data[0].history) {
+        try { currentHistory = typeof data[0].history === 'string' ? JSON.parse(data[0].history) : data[0].history; } catch(e){}
+      }
       const historyEntry = `Cập nhật bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
+      if (!Array.isArray(currentHistory)) currentHistory = [];
       newHistory = [...currentHistory, historyEntry];
     }
 
@@ -47,29 +59,26 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
       history: newHistory
     };
 
-    // Remove undefined fields for Firestore
-    const data = Object.fromEntries(
-      Object.entries(updateData).filter(([_, v]) => v !== undefined)
-    );
-
-    await updateDoc(docRef, data);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${id}`);
-  }
+    const setClause = Object.entries(updateData).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+    if (setClause) {
+      await queryDB(`UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
+    }
+  } catch(e) { console.error('updateLead error', e); }
 };
 
 export const assignLead = async (id: string, assignedToEmail: string | undefined, departmentId: string | undefined, userEmail: string): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, id);
     const now = new Date().toISOString();
+    const dataList = await queryDB(`SELECT history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+    let currentHistory: string[] = [];
+    if (dataList && dataList.length > 0 && dataList[0].history) {
+      try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch(e){}
+    }
     
-    // Get current lead to append to history
-    const docSnap = await getDoc(docRef);
-    const currentHistory = docSnap.exists() ? (docSnap.data() as Lead).history : [];
     let historyEntry = `Giao việc bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
     if (assignedToEmail) historyEntry += ` cho ${assignedToEmail}`;
     if (departmentId) historyEntry += ` cho phòng ban ID ${departmentId}`;
-    
+    if (!Array.isArray(currentHistory)) currentHistory = [];
     const newHistory = [...currentHistory, historyEntry];
 
     const updateData: any = {
@@ -84,38 +93,31 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
     }
     if (departmentId !== undefined) updateData.departmentId = departmentId;
 
-    // Remove undefined fields for Firestore
-    const data = Object.fromEntries(
-      Object.entries(updateData).filter(([_, v]) => v !== undefined)
-    );
-
-    await updateDoc(docRef, data);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${id}`);
-  }
+    const setClause = Object.entries(updateData).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+    if (setClause) {
+      await queryDB(`UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
+    }
+  } catch(e) { console.error('assignLead error', e); }
 };
 
 export const deleteLead = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, id);
-    await deleteDoc(docRef);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${COLLECTION}/${id}`);
-  }
+    await queryDB(`DELETE FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  } catch(e) { console.error('deleteLead error', e); }
 };
 
 export const subscribeToLeads = (role: UserRole, email: string, departmentIds: string[] | undefined, callback: (leads: Lead[]) => void) => {
-  let q = query(collection(db, COLLECTION), orderBy('updatedAt', 'desc'));
-
-  // If we have departmentIds, we can narrow down the query
+  let whereClause = '';
   if (departmentIds && departmentIds.length > 0 && departmentIds.length <= 10) {
-    q = query(collection(db, COLLECTION), where('departmentId', 'in', departmentIds), orderBy('updatedAt', 'desc'));
+    const ids = departmentIds.map(id => escapeSQL(id)).join(', ');
+    whereClause = `WHERE departmentId IN (${ids})`;
   }
 
-  return onSnapshot(q, (snapshot) => {
-    let leads = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Lead);
+  const sql = `SELECT * FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT 1000`;
+
+  return subscribeDB(sql, (data: any[]) => {
+    let leads = data.map(parseLead);
     
-    // Client-side filtering for complex roles and large department lists
     if (['tgd', 'admin'].includes(role)) {
       // Sees everything
     } else if (['gds', 'tp'].includes(role)) {
@@ -123,7 +125,6 @@ export const subscribeToLeads = (role: UserRole, email: string, departmentIds: s
         leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
       }
     } else if (role === 'staff') {
-      // Staff sees leads in their department AND (assigned to them OR created by them)
       leads = leads.filter(l => 
         (departmentIds && l.departmentId && departmentIds.includes(l.departmentId)) &&
         (l.assignedToEmail === email || l.creatorEmail === email)
@@ -131,7 +132,5 @@ export const subscribeToLeads = (role: UserRole, email: string, departmentIds: s
     }
     
     callback(leads);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, COLLECTION);
-  });
+  }, 5000);
 };

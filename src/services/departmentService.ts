@@ -1,46 +1,37 @@
-import { doc, setDoc, updateDoc, deleteDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../firebase';
-import { Department, OperationType } from '../types';
+import { queryDB, escapeSQL, subscribeDB } from '../api';
+import { Department } from '../types';
 
-const COLLECTION = 'departments';
+const parseDepartment = (row: any): Department => {
+  const dep = { ...row };
+  dep.level = Number(dep.level);
+  return dep as Department;
+};
 
 export const createDepartment = async (dept: Department): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, dept.id);
-    // Remove undefined fields for Firestore
-    const data = Object.fromEntries(
-      Object.entries(dept).filter(([_, v]) => v !== undefined)
-    );
-    await setDoc(docRef, data);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${COLLECTION}/${dept.id}`);
-  }
+    const cols = Object.keys(dept).join(', ');
+    const vals = Object.values(dept).map(v => escapeSQL(v)).join(', ');
+    await queryDB(`INSERT INTO departments (${cols}) VALUES (${vals})`);
+  } catch(e) { console.error('createDepartment error', e); }
 };
 
 export const updateDepartment = async (id: string, updates: Partial<Department>): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, id);
-    await updateDoc(docRef, updates);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${id}`);
-  }
+    const setClause = Object.entries(updates).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+    if (setClause) {
+      await queryDB(`UPDATE departments SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
+    }
+  } catch(e) { console.error('updateDepartment error', e); }
 };
 
 export const deleteDepartment = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, id);
-    await deleteDoc(docRef);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${COLLECTION}/${id}`);
-  }
+    await queryDB(`DELETE FROM departments WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  } catch(e) { console.error('deleteDepartment error', e); }
 };
 
 export const subscribeToDepartments = (callback: (depts: Department[]) => void) => {
-  const q = query(collection(db, COLLECTION), orderBy('level', 'asc'));
-  return onSnapshot(q, (snapshot) => {
-    const depts = snapshot.docs.map(doc => doc.data() as Department);
-    callback(depts);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, COLLECTION);
-  });
+  return subscribeDB(`SELECT * FROM departments ORDER BY level ASC LIMIT 100`, (data: any[]) => {
+    callback(data.map(parseDepartment));
+  }, 5000);
 };

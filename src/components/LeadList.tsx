@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3 } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead, deleteLead } from '../services/leadService';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { queryDB, escapeSQL } from '../api';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -60,10 +59,12 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   useEffect(() => {
     const fetchProjects = async () => {
-      const q = query(collection(db, 'projects'), orderBy('name', 'asc'));
-      const snapshot = await getDocs(q);
-      const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
-      setProjects(projectsData);
+      try {
+        const data = await queryDB('SELECT * FROM projects ORDER BY name ASC');
+        if (data && Array.isArray(data)) {
+           setProjects(data as Project[]);
+        }
+      } catch(e) { console.error('fetchProjects error', e); }
     };
     fetchProjects();
   }, []);
@@ -207,10 +208,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     if (newLead.projectId) {
       const selectedProject = projects.find(p => p.id === newLead.projectId);
       if (selectedProject) {
-        const q = query(collection(db, 'leads'), where('projectId', '==', newLead.projectId));
-        const snapshot = await getDocs(q);
-        const count = snapshot.size;
-        customerCode = `${selectedProject.abbreviation}${(count + 1).toString().padStart(2, '0')}`;
+        try {
+          const res = await queryDB(`SELECT COUNT(*) as c FROM leads WHERE projectId = ${escapeSQL(newLead.projectId)}`);
+          if (res && res.length > 0) {
+            const count = parseInt(res[0].c, 10);
+            customerCode = `${selectedProject.abbreviation}${(count + 1).toString().padStart(2, '0')}`;
+          }
+        } catch(e) { console.error('Error counting leads for project', e); }
       }
     }
 

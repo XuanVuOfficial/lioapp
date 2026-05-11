@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Project, UserProfile, OperationType, Lead } from '../types';
+import { Project, UserProfile, Lead } from '../types';
+import { queryDB, escapeSQL, subscribeDB, generateId } from '../api';
 import { Plus, Trash2, FolderKanban, Users, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ProjectListProps {
@@ -18,22 +17,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const projectsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Project[];
-      setProjects(projectsData);
+    const unsubscribe = subscribeDB('SELECT * FROM projects ORDER BY createdAt DESC LIMIT 100', (data: any[]) => {
+      setProjects(data as Project[]);
       setLoading(false);
-    }, (error) => {
-      console.error('Error fetching projects:', JSON.stringify({
-        error: error.message,
-        operationType: OperationType.LIST,
-        path: 'projects',
-        authInfo: { userId: user.uid, email: user.email, providerInfo: [] }
-      }));
-    });
+    }, 5000);
 
     return () => unsubscribe();
   }, [user]);
@@ -43,12 +30,18 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
     if (!newName.trim() || !newAbbreviation.trim()) return;
 
     try {
-      await addDoc(collection(db, 'projects'), {
+      const newProj = {
+        id: generateId(),
         name: newName.trim(),
         abbreviation: newAbbreviation.trim().toLowerCase(),
         createdAt: new Date().toISOString(),
         createdByEmail: user.email
-      });
+      };
+      const cols = Object.keys(newProj).join(', ');
+      const vals = Object.values(newProj).map(v => escapeSQL(v)).join(', ');
+      
+      await queryDB(`INSERT INTO projects (${cols}) VALUES (${vals})`);
+      
       setNewName('');
       setNewAbbreviation('');
       setIsAdding(false);
@@ -60,7 +53,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
   const handleDeleteProject = async (id: string) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa dự án này?')) return;
     try {
-      await deleteDoc(doc(db, 'projects', id));
+      await queryDB(`DELETE FROM projects WHERE id = ${escapeSQL(id)} LIMIT 1`);
     } catch (error) {
       console.error('Error deleting project:', error);
     }

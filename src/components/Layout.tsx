@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, Department } from '../types';
 import { AppSettings } from '../services/settingsService';
 import { updateUserProfile } from '../services/userService';
 

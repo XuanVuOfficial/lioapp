@@ -1,67 +1,60 @@
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, getDocs, deleteDoc } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../firebase';
-import { UserProfile, OperationType, UserRole } from '../types';
+import { queryDB, escapeSQL, subscribeDB, generateId } from '../api';
+import { UserProfile, UserRole } from '../types';
 
-const COLLECTION = 'users';
+const parseUser = (row: any): UserProfile => {
+  const user = { ...row };
+  if (user.managedDeptIds && typeof user.managedDeptIds === 'string') {
+    try {
+      user.managedDeptIds = JSON.parse(user.managedDeptIds);
+    } catch(e) {}
+  }
+  user.mustChangePassword = user.mustChangePassword === '1' || user.mustChangePassword === 1 || user.mustChangePassword === true;
+  user.createdAt = user.createdAt ? Number(user.createdAt) : undefined;
+  user.updatedAt = user.updatedAt ? Number(user.updatedAt) : undefined;
+  return user as UserProfile;
+};
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
-    const docRef = doc(db, COLLECTION, uid);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return docSnap.data() as UserProfile;
+    const data = await queryDB(`SELECT * FROM users WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
+    if (data && data.length > 0) {
+      return parseUser(data[0]);
     }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `${COLLECTION}/${uid}`);
-    return null;
-  }
+  } catch(e) { console.error('getUserProfile error', e); }
+  return null;
 };
 
 export const getUserProfileByEmail = async (email: string): Promise<UserProfile | null> => {
   try {
-    const q = query(collection(db, COLLECTION), where('email', '==', email));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      return querySnapshot.docs[0].data() as UserProfile;
+    const data = await queryDB(`SELECT * FROM users WHERE email = ${escapeSQL(email)} LIMIT 1`);
+    if (data && data.length > 0) {
+      return parseUser(data[0]);
     }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, COLLECTION);
-    return null;
-  }
+  } catch(e) { console.error('getUserProfileByEmail error', e); }
+  return null;
 };
 
 export const verifyCredentials = async (email: string, pass: string): Promise<UserProfile | null> => {
   try {
-    const q = query(collection(db, COLLECTION), where('email', '==', email), where('password', '==', pass));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      return querySnapshot.docs[0].data() as UserProfile;
+    const data = await queryDB(`SELECT * FROM users WHERE email = ${escapeSQL(email)} AND password = ${escapeSQL(pass)} LIMIT 1`);
+    if (data && data.length > 0) {
+      return parseUser(data[0]);
     }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, COLLECTION);
-    return null;
-  }
+  } catch(e) { console.error('verifyCredentials error', e); }
+  return null;
 };
 
 export const createUserProfile = async (profile: UserProfile): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, profile.uid);
-    // Remove undefined fields for Firestore
-    const data = Object.fromEntries(
-      Object.entries(profile).filter(([_, v]) => v !== undefined)
-    );
-    await setDoc(docRef, data);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${COLLECTION}/${profile.uid}`);
-  }
+    const cols = Object.keys(profile).join(', ');
+    const vals = Object.values(profile).map(v => escapeSQL(v)).join(', ');
+    await queryDB(`INSERT INTO users (${cols}) VALUES (${vals})`);
+  } catch(e) { console.error('createUserProfile error', e); }
 };
 
 export const createStaffAccount = async (profile: Omit<UserProfile, 'uid'>, password: string): Promise<void> => {
   try {
-    const uid = 'user_' + Math.random().toString(36).substr(2, 9);
+    const uid = 'user_' + generateId();
     await createUserProfile({
       ...profile,
       uid,
@@ -75,53 +68,38 @@ export const createStaffAccount = async (profile: Omit<UserProfile, 'uid'>, pass
 
 export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, uid);
-    // Remove undefined fields
-    const updateData = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
-    );
-    await updateDoc(docRef, updateData);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${uid}`);
-  }
+    const setClause = Object.entries(updates).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+    if (setClause) {
+      await queryDB(`UPDATE users SET ${setClause} WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
+    }
+  } catch(e) { console.error('updateUserProfile error', e); }
 };
 
 export const updateUserRole = async (uid: string, role: UserRole, departmentId?: string): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, uid);
-    const updateData: any = { role };
-    if (departmentId !== undefined) updateData.departmentId = departmentId;
+    const updates: any = { role };
+    if (departmentId !== undefined) updates.departmentId = departmentId;
+    else updates.departmentId = null;
     
-    await updateDoc(docRef, updateData);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${uid}`);
-  }
+    const setClause = Object.entries(updates).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+    await queryDB(`UPDATE users SET ${setClause} WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
+  } catch(e) { console.error('updateUserRole error', e); }
 };
 
 export const subscribeToUsersByDepartment = (departmentId: string, callback: (users: UserProfile[]) => void) => {
-  const q = query(collection(db, COLLECTION), where('departmentId', '==', departmentId));
-  return onSnapshot(q, (snapshot) => {
-    const users = snapshot.docs.map(doc => doc.data() as UserProfile);
-    callback(users);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, COLLECTION);
-  });
+  return subscribeDB(`SELECT * FROM users WHERE departmentId = ${escapeSQL(departmentId)} ORDER BY createdAt DESC LIMIT 500`, (data: any[]) => {
+    callback(data.map(parseUser));
+  }, 5000);
 };
 
 export const subscribeToAllUsers = (callback: (users: UserProfile[]) => void) => {
-  const q = query(collection(db, COLLECTION));
-  return onSnapshot(q, (snapshot) => {
-    const users = snapshot.docs.map(doc => doc.data() as UserProfile);
-    callback(users);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, COLLECTION);
-  });
+  return subscribeDB(`SELECT * FROM users ORDER BY createdAt DESC LIMIT 500`, (data: any[]) => {
+    callback(data.map(parseUser));
+  }, 5000);
 };
 
 export const deleteUser = async (uid: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, COLLECTION, uid));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${COLLECTION}/${uid}`);
-  }
+    await queryDB(`DELETE FROM users WHERE uid = ${escapeSQL(uid)} LIMIT 1`);
+  } catch(e) { console.error('deleteUser error', e); }
 };

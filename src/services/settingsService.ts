@@ -1,8 +1,5 @@
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../firebase';
-import { OperationType } from '../types';
+import { queryDB, escapeSQL, subscribeDB } from '../api';
 
-const COLLECTION = 'settings';
 const DOC_ID = 'app_settings';
 
 export interface AppSettings {
@@ -31,40 +28,46 @@ const DEFAULT_SETTINGS: AppSettings = {
   }
 };
 
+const parseSettings = (row: any): AppSettings => {
+  const settings = { ...DEFAULT_SETTINGS };
+  if (row.tabVisibility) {
+    try {
+      settings.tabVisibility = typeof row.tabVisibility === 'string' ? JSON.parse(row.tabVisibility) : row.tabVisibility;
+    } catch(e){}
+  }
+  if (row.roleLimits) {
+    try {
+      settings.roleLimits = typeof row.roleLimits === 'string' ? JSON.parse(row.roleLimits) : row.roleLimits;
+    } catch(e){}
+  }
+  return settings;
+}
+
 export const getAppSettings = async (): Promise<AppSettings> => {
   try {
-    const docRef = doc(db, COLLECTION, DOC_ID);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return docSnap.data() as AppSettings;
+    const data = await queryDB(`SELECT * FROM settings WHERE id = ${escapeSQL(DOC_ID)} LIMIT 1`);
+    if (data && data.length > 0) {
+      return parseSettings(data[0]);
     }
+    
     // Initialize with defaults if not exists
-    await setDoc(docRef, DEFAULT_SETTINGS);
+    await updateAppSettings(DEFAULT_SETTINGS);
     return DEFAULT_SETTINGS;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `${COLLECTION}/${DOC_ID}`);
-    return DEFAULT_SETTINGS;
-  }
+  } catch(e) { console.error('getAppSettings error', e); return DEFAULT_SETTINGS; }
 };
 
 export const updateAppSettings = async (settings: AppSettings): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION, DOC_ID);
-    await setDoc(docRef, settings);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${DOC_ID}`);
-  }
+    await queryDB(`INSERT INTO settings (id, tabVisibility, roleLimits) VALUES (${escapeSQL(DOC_ID)}, ${escapeSQL(settings.tabVisibility)}, ${escapeSQL(settings.roleLimits)}) ON DUPLICATE KEY UPDATE tabVisibility = VALUES(tabVisibility), roleLimits = VALUES(roleLimits)`);
+  } catch(e) { console.error('updateAppSettings error', e); }
 };
 
 export const subscribeToSettings = (callback: (settings: AppSettings) => void) => {
-  const docRef = doc(db, COLLECTION, DOC_ID);
-  return onSnapshot(docRef, (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data() as AppSettings);
+  return subscribeDB(`SELECT * FROM settings WHERE id = ${escapeSQL(DOC_ID)} LIMIT 1`, (data: any[]) => {
+    if (data && data.length > 0) {
+      callback(parseSettings(data[0]));
     } else {
       callback(DEFAULT_SETTINGS);
     }
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, `${COLLECTION}/${DOC_ID}`);
-  });
+  }, 10000);
 };
