@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Lead } from '../types';
-import { Bell, X } from 'lucide-react';
+import { Bell } from 'lucide-react';
+import { messaging, getToken, onMessage, database, ref, set } from '../firebase';
 
 interface NotificationManagerProps {
   userEmail: string;
@@ -20,10 +21,41 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ userEm
       if (Notification.permission === 'default') {
         // Delay a bit before showing to not flash immediately on load
         setTimeout(() => setShowPermissionModal(true), 1500);
+      } else if (Notification.permission === 'granted') {
+        setupFCM();
       }
     };
     checkPermission();
-  }, []);
+  }, [userEmail]);
+
+  const setupFCM = async () => {
+    if (!messaging) return;
+    try {
+      // NOTE: For a production app, you can pass a vapidKey generated from Firebase Console
+      // to getToken(messaging, { vapidKey: "YOUR_PUBLIC_VAPID_KEY_HERE" });
+      const currentToken = await getToken(messaging);
+      
+      if (currentToken) {
+        // Save token to Realtime Database so backend/server can push
+        const encodedEmail = userEmail.replace(/\./g, '_');
+        await set(ref(database, `fcmTokens/${encodedEmail}`), currentToken);
+        console.log("FCM Token saved for push notifications.");
+      } else {
+        console.warn('No registration token available. Request permission to generate one.');
+      }
+
+      // Foreground message handler
+      onMessage(messaging, (payload) => {
+        console.log("Foreground message received:", payload);
+        if (payload.notification) {
+          sendLocalNotification(payload.notification.title || "Thông báo", payload.notification.body || "");
+        }
+      });
+
+    } catch (err) {
+      console.error('An error occurred while retrieving token. ', err);
+    }
+  };
 
   const requestPermission = async () => {
     if (!('Notification' in window)) return;
@@ -31,6 +63,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ userEm
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         setShowPermissionModal(false);
+        setupFCM();
       } else {
         setShowPermissionModal(false);
       }
@@ -40,7 +73,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ userEm
     }
   };
 
-  const sendNotification = async (title: string, body: string) => {
+  const sendLocalNotification = async (title: string, body: string) => {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
       try {
@@ -48,14 +81,14 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ userEm
         if (registration && registration.showNotification) {
           registration.showNotification(title, {
             body,
-            icon: 'https://app.xuanvu.click/khachhang/icon.jpg',
+            icon: '/pwa-192x192.png',
             vibrate: [200, 100, 200]
-          });
+          } as any);
         } else {
-           new Notification(title, { body, icon: 'https://app.xuanvu.click/khachhang/icon.jpg' });
+           new Notification(title, { body, icon: '/pwa-192x192.png' });
         }
       } catch (err) {
-        new Notification(title, { body, icon: 'https://app.xuanvu.click/khachhang/icon.jpg' });
+        new Notification(title, { body, icon: '/pwa-192x192.png' });
       }
     }
   };
@@ -72,26 +105,17 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ userEm
 
     const currentMap = new Map();
     leads.forEach(l => currentMap.set(l.id, l));
-
     const prevMap = prevLeadsRef.current;
 
-    // Check for new assignments
+    // Check for new assignments (Local fallback in front-end when app is OPEN)
     leads.forEach(lead => {
       const prevLead = prevMap.get(lead.id);
       
-      // If it's a new lead assigned to me
       if (!prevLead && lead.assignedToEmail === userEmail) {
-        sendNotification(
-          "Khách hàng mới được chia",
-          `Bạn vừa được chia khách hàng: ${lead.name || lead.phone}`
-        );
+        sendLocalNotification("Khách hàng mới", `Bạn vừa được chia: ${lead.name || lead.phone}`);
       }
-      // Or if it's an existing lead but newly assigned to me
       else if (prevLead && prevLead.assignedToEmail !== userEmail && lead.assignedToEmail === userEmail) {
-        sendNotification(
-          "Nhận khách hàng mới",
-          `Khách hàng ${lead.name || lead.phone} vừa được chuyển cho bạn.`
-        );
+        sendLocalNotification("Nhận khách hàng mới", `Khách hàng ${lead.name || lead.phone} vừa được chuyển cho bạn.`);
       }
     });
 
@@ -110,7 +134,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ userEm
           Bật thông báo
         </h3>
         <p className="text-sm text-slate-600 text-center mb-6">
-          Cho phép ứng dụng gửi thông báo cho bạn mỗi khi có khách hàng mới được chia để không bỏ lỡ công việc.
+          Cho phép gửi thông báo khi có khách hàng mới được chia. Khi bạn tắt màn hình, thông báo vẫn sẽ hoạt động nhờ FCM.
         </p>
         <div className="flex gap-3">
           <button
