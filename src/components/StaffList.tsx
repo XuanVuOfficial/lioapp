@@ -5,6 +5,7 @@ import { UserProfile, Department, UserRole } from '../types';
 import { createStaffAccount, updateUserRole, deleteUser, updateUserProfile } from '../services/userService';
 import { updateDepartment } from '../services/departmentService';
 import { getAppSettings } from '../services/settingsService';
+import { compressImage } from '../utils/imageUtils';
 
 interface Props {
   users: UserProfile[];
@@ -46,15 +47,11 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Vui lòng chọn ảnh nhỏ hơn 2MB');
-        return;
-      }
-      
       try {
         setIsLoading(true);
+        const compressedFile = await compressImage(file, 2000);
         const formData = new FormData();
-        formData.append("image", file);
+        formData.append("image", compressedFile);
         
         const res = await fetch("https://app.xuanvu.click/hktt/upload_avatar.php", {
             method: "POST",

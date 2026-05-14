@@ -5,6 +5,8 @@ import { UserProfile, Department } from '../types';
 import { AppSettings } from '../services/settingsService';
 import { updateUserProfile } from '../services/userService';
 
+import { compressImage } from '../utils/imageUtils';
+
 interface LayoutProps {
   user: UserProfile | null;
   children: React.ReactNode;
@@ -56,15 +58,11 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Vui lòng chọn ảnh nhỏ hơn 2MB');
-        return;
-      }
-      
       try {
         setIsSaving(true);
+        const compressedFile = await compressImage(file, 2000);
         const formData = new FormData();
-        formData.append("image", file);
+        formData.append("image", compressedFile);
         
         const res = await fetch("https://app.xuanvu.click/hktt/upload_avatar.php", {
             method: "POST",
@@ -231,7 +229,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
             </button>
             <div className="px-3 py-1">
               <p className="text-[10px] text-slate-400 font-mono">
-                v1.2.1
+                v1.2.2
               </p>
             </div>
           </div>
