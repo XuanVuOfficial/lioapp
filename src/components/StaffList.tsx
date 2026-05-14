@@ -24,7 +24,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     password: '',
     role: 'staff' as UserRole,
     departmentId: '',
-    avatarUrl: ''
+    avatarUrl: '',
+    hireDate: ''
   });
 
   const filteredUsers = users.filter(u => 
@@ -105,7 +106,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         createdBy: currentUser.email,
         updatedAt: Date.now(),
         avatarUrl: newUser.avatarUrl || undefined,
-        mustChangePassword: true
+        mustChangePassword: true,
+        hireDate: newUser.hireDate || undefined
       }, newUser.password);
       
       // If a management role was assigned, update the department's manager info
@@ -117,7 +119,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       }
 
       setShowAddModal(false);
-      setNewUser({ email: '', displayName: '', password: '', role: 'staff', departmentId: '', avatarUrl: '' });
+      setNewUser({ email: '', displayName: '', password: '', role: 'staff', departmentId: '', avatarUrl: '', hireDate: '' });
       setSelectedFloorId('');
     } catch (error: any) {
       alert('Lỗi khi tạo tài khoản: ' + error.message);
@@ -155,7 +157,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         role: editingUser.role,
         departmentId: editingUser.departmentId || undefined,
         updatedAt: Date.now(),
-        avatarUrl: editingUser.avatarUrl || undefined
+        avatarUrl: editingUser.avatarUrl || undefined,
+        hireDate: editingUser.hireDate || undefined
       };
       if (editingUser.password) {
         updates.password = editingUser.password;
@@ -220,6 +223,33 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     );
   };
 
+  const calculateTenure = (hireDate?: string) => {
+    if (!hireDate) return 'Chưa có thông tin';
+    const start = new Date(hireDate);
+    const end = new Date();
+    
+    let years = end.getFullYear() - start.getFullYear();
+    let months = end.getMonth() - start.getMonth();
+    let days = end.getDate() - start.getDate();
+
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    const parts = [];
+    if (years > 0) parts.push(`${years} năm`);
+    if (months > 0) parts.push(`${months} tháng`);
+    if (days > 0) parts.push(`${days} ngày`);
+    
+    return parts.length > 0 ? parts.join(' ') : '0 ngày';
+  };
+
   const renderDetailedRoles = (user: UserProfile) => {
     const roleNodes: React.ReactNode[] = [];
     
@@ -275,7 +305,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       password: '',
       role: 'staff' as UserRole,
       departmentId: currentUser.role === 'tp' ? (currentUser.departmentId || '') : '',
-      avatarUrl: ''
+      avatarUrl: '',
+      hireDate: ''
     });
     setShowAddModal(true);
   };
@@ -328,6 +359,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
               <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-semibold">Nhân viên</th>
                 <th className="px-6 py-4 font-semibold">Vai trò hệ thống</th>
+                <th className="px-6 py-4 font-semibold">Thâm niên</th>
                 <th className="px-6 py-4 font-semibold">Vai trò đang tham gia</th>
                 <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
               </tr>
@@ -361,6 +393,10 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                       <Shield className="w-3 h-3" />
                       {getSystemRole(user.role)}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-medium text-slate-700">{calculateTenure(user.hireDate)}</p>
+                    {user.hireDate && <p className="text-[10px] text-slate-400">Từ: {new Date(user.hireDate).toLocaleDateString('vi-VN')}</p>}
                   </td>
                   <td className="px-6 py-4 align-top">
                     {renderDetailedRoles(user)}
@@ -451,7 +487,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
                     user.role === 'tgd' ? 'bg-red-50 text-red-700' :
                     user.role === 'admin' ? 'bg-purple-50 text-purple-700' :
@@ -461,6 +497,9 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   }`}>
                     <Shield className="w-3 h-3" />
                     {getSystemRole(user.role)}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg">
+                    {calculateTenure(user.hireDate)}
                   </span>
                 </div>
                 <div className="pl-1 mt-2">
@@ -537,6 +576,15 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                       placeholder="Nhập mật khẩu cho nhân viên"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày nhận việc</label>
+                  <input 
+                    type="date" 
+                    value={newUser.hireDate}
+                    onChange={e => setNewUser(prev => ({ ...prev, hireDate: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Cấp bậc / Phân quyền</label>
@@ -722,6 +770,19 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   </div>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày nhận việc</label>
+                  <input 
+                    type="date" 
+                    value={editingUser.hireDate || ''}
+                    disabled={!!users.find(u => u.uid === editingUser.uid)?.hireDate}
+                    onChange={e => setEditingUser(prev => prev ? ({ ...prev, hireDate: e.target.value }) : null)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                  {!!users.find(u => u.uid === editingUser.uid)?.hireDate && (
+                    <p className="text-[10px] text-amber-600 mt-1 italic">* Ngày nhận việc không thể thay đổi sau khi đã nhập</p>
+                  )}
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Cấp bậc / Phân quyền</label>
                   <select 
                     value={editingUser.role}
@@ -886,6 +947,18 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Ngày cập nhật gần nhất</p>
                   <p className="text-slate-900 font-medium">
                     {infoUser.updatedAt ? new Date(infoUser.updatedAt).toLocaleString('vi-VN') : 'Không có thông tin'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Ngày nhận việc</p>
+                  <p className="text-slate-900 font-medium">
+                    {infoUser.hireDate ? new Date(infoUser.hireDate).toLocaleDateString('vi-VN') : 'Không có thông tin'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Thời gian công tác</p>
+                  <p className="text-slate-900 font-medium">
+                    {calculateTenure(infoUser.hireDate)}
                   </p>
                 </div>
               </div>

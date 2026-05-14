@@ -211,7 +211,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
             </button>
             <div className="px-3 py-1">
               <p className="text-[10px] text-slate-400 font-mono">
-                v1.1.0
+                v1.2.1
               </p>
             </div>
           </div>

@@ -13,6 +13,7 @@ export interface UserProfile {
   updatedAt?: number;
   avatarUrl?: string;
   mustChangePassword?: boolean;
+  hireDate?: string;
 }
 
 export interface Department {
