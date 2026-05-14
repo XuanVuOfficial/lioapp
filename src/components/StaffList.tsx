@@ -19,6 +19,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [infoUser, setInfoUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [newUser, setNewUser] = useState({
     email: '',
     displayName: '',
@@ -48,7 +49,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     const file = e.target.files?.[0];
     if (file) {
       try {
-        setIsLoading(true);
+        setIsUploadingAvatar(true);
         const compressedFile = await compressImage(file, 2000);
         const formData = new FormData();
         formData.append("image", compressedFile);
@@ -60,8 +61,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         
         const result = await res.json();
         
-        if (result.success && result.data && result.data.avatar_1080) {
-          const avatarUrl = `https://app.xuanvu.click${result.data.avatar_1080}`;
+        if (result.success && result.data && result.data.avatar_100) {
+          const avatarUrl = `https://app.xuanvu.click${result.data.avatar_100}`;
           if (isEdit) {
             setEditingUser(prev => prev ? ({ ...prev, avatarUrl }) : null);
           } else {
@@ -74,7 +75,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         console.error('Lỗi upload avatar:', error);
         alert('Có lỗi xảy ra khi upload ảnh');
       } finally {
-        setIsLoading(false);
+        setIsUploadingAvatar(false);
       }
     }
   };
@@ -536,19 +537,24 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200"
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full flex flex-col max-h-[90vh] border border-slate-200"
             >
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
                 <h3 className="text-xl font-bold text-slate-900">Thêm nhân viên mới</h3>
                 <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
               
-              <div className="space-y-4">
+              <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex justify-center mb-6">
                   <div className="relative">
-                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative">
+                      {isUploadingAvatar && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-10">
+                          <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
                       {newUser.avatarUrl ? (
                         <img src={newUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
@@ -703,7 +709,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
+              <div className="p-6 border-t border-slate-100 flex gap-3 shrink-0">
                 <button 
                   onClick={() => setShowAddModal(false)}
                   className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition-all"
@@ -734,19 +740,24 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200"
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full flex flex-col max-h-[90vh] border border-slate-200"
             >
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
                 <h3 className="text-xl font-bold text-slate-900">Chỉnh sửa nhân viên</h3>
                 <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
               
-              <div className="space-y-4">
+              <div className="p-6 overflow-y-auto space-y-4">
                 <div className="flex justify-center mb-6">
                   <div className="relative">
-                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative">
+                      {isUploadingAvatar && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-10">
+                          <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
                       {editingUser.avatarUrl ? (
                         <img src={editingUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
@@ -899,7 +910,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
+              <div className="p-6 border-t border-slate-100 flex gap-3 shrink-0">
                 <button 
                   onClick={() => setEditingUser(null)}
                   className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition-all"

@@ -22,6 +22,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
   const [isEditProfileOpen, setIsEditProfileOpen] = React.useState(false);
   const [editingProfile, setEditingProfile] = React.useState<{ password?: string; avatarUrl?: string }>({});
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
 
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
@@ -59,7 +60,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
     const file = e.target.files?.[0];
     if (file) {
       try {
-        setIsSaving(true);
+        setIsUploadingAvatar(true);
         const compressedFile = await compressImage(file, 2000);
         const formData = new FormData();
         formData.append("image", compressedFile);
@@ -71,8 +72,8 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
         
         const result = await res.json();
         
-        if (result.success && result.data && result.data.avatar_1080) {
-          const avatarUrl = `https://app.xuanvu.click${result.data.avatar_1080}`;
+        if (result.success && result.data && result.data.avatar_100) {
+          const avatarUrl = `https://app.xuanvu.click${result.data.avatar_100}`;
           setEditingProfile(prev => ({ ...prev, avatarUrl }));
         } else {
           alert('Upload ảnh thất bại: ' + (result.message || 'Lỗi không xác định'));
@@ -81,7 +82,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
         console.error('Lỗi upload avatar:', error);
         alert('Có lỗi xảy ra khi upload ảnh');
       } finally {
-        setIsSaving(false);
+        setIsUploadingAvatar(false);
       }
     }
   };
@@ -310,7 +311,12 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
                 <form id="editProfileForm" onSubmit={handleSaveProfile} className="space-y-6">
                   <div className="flex justify-center mb-6">
                     <div className="relative">
-                      <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                      <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative">
+                        {isUploadingAvatar && (
+                          <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-10">
+                            <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
                         {editingProfile.avatarUrl ? (
                           <img src={editingProfile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
