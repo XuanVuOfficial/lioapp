@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Share, PlusSquare, X, Smartphone } from 'lucide-react';
 
-const SHOW_PWA_PROMPT: number = 0; // 1 bật, 0 tắt
+const SHOW_PWA_PROMPT: number = 1; // 1 bật, 0 tắt
 
 export const PWAInstallPrompt: React.FC = () => {
   const [showPrompt, setShowPrompt] = useState(false);
