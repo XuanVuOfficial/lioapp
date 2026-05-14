@@ -53,18 +53,38 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
     return navItems.filter(item => allowedTabs.includes(item.id));
   }, [user, settings]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
         alert('Vui lòng chọn ảnh nhỏ hơn 2MB');
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditingProfile(prev => ({ ...prev, avatarUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      
+      try {
+        setIsSaving(true);
+        const formData = new FormData();
+        formData.append("image", file);
+        
+        const res = await fetch("https://app.xuanvu.click/hktt/upload_avatar.php", {
+            method: "POST",
+            body: formData
+        });
+        
+        const result = await res.json();
+        
+        if (result.success && result.data && result.data.avatar_1080) {
+          const avatarUrl = `https://app.xuanvu.click${result.data.avatar_1080}`;
+          setEditingProfile(prev => ({ ...prev, avatarUrl }));
+        } else {
+          alert('Upload ảnh thất bại: ' + (result.message || 'Lỗi không xác định'));
+        }
+      } catch (error) {
+        console.error('Lỗi upload avatar:', error);
+        alert('Có lỗi xảy ra khi upload ảnh');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
