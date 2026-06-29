@@ -35,18 +35,38 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
   const cols = Object.keys(data).join(', ');
   const vals = Object.values(data).map(v => escapeSQL(v)).join(', ');
   await executeMutation('leads', 'CREATE', newLead, `INSERT INTO leads (${cols}) VALUES (${vals})`);
+
+  // Send push notification to assigned employee
+  if (newLead.assignedToEmail) {
+    try {
+      const { sendPushNotification } = await import('./notificationService');
+      await sendPushNotification(
+        newLead.assignedToEmail,
+        'Khách hàng mới được giao 💼',
+        `Bạn vừa được giao khách hàng ${newLead.customerName} bởi ${newLead.creatorEmail}`
+      );
+    } catch (err) {
+      console.error('Error sending push notification for new lead:', err);
+    }
+  }
 };
 
 export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: string): Promise<void> => {
   const now = new Date().toISOString();
   let newHistory = updates.history;
+  let customerName = updates.customerName;
+  let assignedEmail = updates.assignedToEmail;
   
-  if (!newHistory) {
-    // We still need to fetch the history first, unfortunately
-    const data = await queryDB(`SELECT history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  if (!newHistory || !customerName || !assignedEmail) {
+    // Fetch current details from DB
+    const data = await queryDB(`SELECT customerName, assignedToEmail, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
     let currentHistory: string[] = [];
-    if (data && data.length > 0 && data[0].history) {
-      try { currentHistory = typeof data[0].history === 'string' ? JSON.parse(data[0].history) : data[0].history; } catch(e){}
+    if (data && data.length > 0) {
+      if (data[0].history) {
+        try { currentHistory = typeof data[0].history === 'string' ? JSON.parse(data[0].history) : data[0].history; } catch(e){}
+      }
+      if (!customerName) customerName = data[0].customerName;
+      if (!assignedEmail) assignedEmail = data[0].assignedToEmail;
     }
     const historyEntry = `[LOG] Cập nhật bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
     if (!Array.isArray(currentHistory)) currentHistory = [];
@@ -64,14 +84,35 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
   if (setClause) {
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
+
+  // Notify assigned salesperson of the lead update if updated by someone else
+  if (assignedEmail && assignedEmail !== userEmail) {
+    try {
+      const { sendPushNotification } = await import('./notificationService');
+      await sendPushNotification(
+        assignedEmail,
+        'Cập nhật thông tin khách hàng ✍️',
+        `Khách hàng ${customerName || 'của bạn'} vừa được cập nhật bởi ${userEmail}`
+      );
+    } catch (err) {
+      console.error('Error sending push notification on updateLead:', err);
+    }
+  }
 };
 
 export const assignLead = async (id: string, assignedToEmail: string | undefined, departmentId: string | undefined, userEmail: string): Promise<void> => {
   const now = new Date().toISOString();
-  const dataList = await queryDB(`SELECT history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  const dataList = await queryDB(`SELECT customerName, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
   let currentHistory: string[] = [];
-  if (dataList && dataList.length > 0 && dataList[0].history) {
-    try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch(e){}
+  let customerName = 'Khách hàng';
+  
+  if (dataList && dataList.length > 0) {
+    if (dataList[0].history) {
+      try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch(e){}
+    }
+    if (dataList[0].customerName) {
+      customerName = dataList[0].customerName;
+    }
   }
   
   let historyEntry = `[LOG] Giao việc bởi ${userEmail} lúc ${new Date(now).toLocaleString('vi-VN')}`;
@@ -95,6 +136,20 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   const setClause = Object.entries(updateData).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
   if (setClause) {
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  }
+
+  // Notify assigned employee of lead assignment
+  if (assignedToEmail) {
+    try {
+      const { sendPushNotification } = await import('./notificationService');
+      await sendPushNotification(
+        assignedToEmail,
+        'Khách hàng mới được giao 💼',
+        `Bạn vừa được giao khách hàng ${customerName} bởi ${userEmail}`
+      );
+    } catch (err) {
+      console.error('Error sending push notification on assignLead:', err);
+    }
   }
 };
 

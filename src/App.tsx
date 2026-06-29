@@ -16,6 +16,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
 import { AppSettings, subscribeToSettings } from './services/settingsService';
+import { registerNotifications } from './services/notificationService';
+
 
 const TGD_EMAIL = 'Tongsan@gmail.com';
 
@@ -58,6 +60,12 @@ export default function App() {
 
     checkSession();
   }, []);
+
+  useEffect(() => {
+    if (user && user.email) {
+      registerNotifications(user.email);
+    }
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem('salespro_uid');
