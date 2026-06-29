@@ -28,13 +28,13 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
       let profile = await verifyCredentials(loginEmail, password);
       
       // Bootstrap TGĐ if it doesn't exist
-      if (!profile && loginEmail === 'Tongsan@gmail.com' && password === '12345') {
+      if (!profile && loginEmail === 'Tongsan@gmail.com' && password === '342343234232') {
         profile = {
           uid: 'tgd_root',
           email: 'Tongsan@gmail.com',
           displayName: 'Tổng giám đốc',
           role: 'tgd',
-          password: '12345'
+          password: '342343234232'
         };
         await createUserProfile(profile);
       }
