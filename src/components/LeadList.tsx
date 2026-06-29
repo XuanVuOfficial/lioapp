@@ -31,6 +31,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [selectedAssignDeptId, setSelectedAssignDeptId] = useState<string>('');
   const [showStats, setShowStats] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [visibleCount, setVisibleCount] = useState(30);
+  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Reset visible count when filters or search terms change to keep loading fast
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [searchTerm, currentTab, assignFilter, selectedProjectId, selectedDeptId]);
 
   const [newNote, setNewNote] = useState('');
   const [newLead, setNewLead] = useState<Partial<Lead>>({
@@ -174,6 +181,40 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     
     return matchesSearch && matchesTab && matchesProject && matchesDept && matchesAssign;
   });
+
+  const displayedLeads = React.useMemo(() => {
+    return filteredLeads.slice(0, visibleCount);
+  }, [filteredLeads, visibleCount]);
+
+  const hasMore = filteredLeads.length > visibleCount;
+
+  const loadMore = React.useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + 30, filteredLeads.length));
+  }, [filteredLeads.length]);
+
+  // Infinite scroll using IntersectionObserver
+  useEffect(() => {
+    if (!hasMore) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        loadMore();
+      }
+    }, {
+      rootMargin: '200px', // start loading before user reaches the bottom
+    });
+
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [hasMore, loadMore]);
 
   // Statistics Data
   const statsLeads = selectedProjectId ? leads.filter(l => l.projectId === selectedProjectId) : leads;
@@ -546,7 +587,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <p className="text-sm px-4 text-center">Không tìm thấy khách hàng nào. Hãy tạo mới để bắt đầu.</p>
             </div>
           ) : (
-            filteredLeads.map(lead => (
+            displayedLeads.map(lead => (
               <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -686,6 +727,24 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             ))
           )}
         </AnimatePresence>
+        
+        {hasMore && (
+          <div ref={sentinelRef} className="flex flex-col items-center justify-center py-6 gap-2">
+            <div className="flex items-center gap-2 text-slate-500 text-sm">
+              <svg className="animate-spin h-5 w-5 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Đang tải thêm khách hàng...
+            </div>
+            <button
+              onClick={loadMore}
+              className="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-all shadow-sm border border-slate-200"
+            >
+              Tải thêm ngay ({filteredLeads.length - visibleCount} khách hàng còn lại)
+            </button>
+          </div>
+        )}
       </div>
     </>
   )}
