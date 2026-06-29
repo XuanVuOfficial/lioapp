@@ -14,7 +14,6 @@ import { ProjectList } from './components/ProjectList';
 import { Settings } from './components/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { NotificationManager } from './components/NotificationManager';
 import { Loader2 } from 'lucide-react';
 import { AppSettings, subscribeToSettings } from './services/settingsService';
 
@@ -238,7 +237,6 @@ export default function App() {
         {renderContent()}
       </Layout>
       <PWAInstallPrompt />
-      {effectiveUser && <NotificationManager userEmail={effectiveUser.email} leads={leads} />}
     </ErrorBoundary>
   );
 }

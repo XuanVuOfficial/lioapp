@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead, deleteLead } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
+import { exportLeadsToExcel } from '../utils/excelExport';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -84,6 +85,20 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     'Đã booking',
     'Đã cọc'
   ];
+
+  const handleExportExcel = async () => {
+    try {
+      const projName = projects.find(p => p.id === selectedProjectId)?.name;
+      await exportLeadsToExcel({
+        leads: filteredLeads,
+        departments,
+        selectedDeptId,
+        projectName: projName
+      });
+    } catch (e: any) {
+      alert('Lỗi khi xuất excel: ' + e.message);
+    }
+  };
 
   const getSubDeptIdsRecursive = React.useCallback((deptId: string): string[] => {
     const ids = [deptId];
@@ -365,6 +380,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
             />
           </div>
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl font-semibold text-sm transition-all shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Xuất Excel
+          </button>
           <button 
             onClick={() => setShowAddModal(true)}
             className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-100"
