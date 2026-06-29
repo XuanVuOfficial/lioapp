@@ -83,8 +83,8 @@ export const exportLeadsToExcel = async ({
   ];
 
   // 3. Merging header zones as per screenshot
-  // Left Section (Logo Area): Merge A1:C3
-  worksheet.mergeCells('A1:C3');
+  // Left Section (Logo Area): Merge A1:C2
+  worksheet.mergeCells('A1:C2');
   const logoCell = worksheet.getCell('A1');
   logoCell.value = 'THIÊN LONG\nTỔNG SÀN GIAO DỊCH BĐS';
   logoCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -199,7 +199,7 @@ export const exportLeadsToExcel = async ({
 
   // Apply borders specifically to merged logo & title blocks as well
   const titleAndLogoCells = [
-    'A1', 'B1', 'C1', 'A2', 'B2', 'C2', 'A3', 'B3', 'C3',
+    'A1', 'B1', 'C1', 'A2', 'B2', 'C2',
     'D1', 'E1', 'F1', 'G1', 'H1', 'I1', 'J1', 'K1', 'L1',
     'D2', 'E2', 'F2', 'G2', 'H2', 'I2', 'J2', 'K2', 'L2'
   ];
