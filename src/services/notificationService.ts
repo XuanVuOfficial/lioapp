@@ -26,6 +26,15 @@ export const registerNotifications = async (email: string) => {
     return;
   }
 
+  // Check if this device is already registered for this user
+  const cacheKey = `fcm_registered_${email}`;
+  const cachedToken = localStorage.getItem(cacheKey);
+
+  if (cachedToken && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    console.log(`[FCM] Device already registered for ${email}. Skipping duplicate registration.`);
+    return;
+  }
+
   try {
     // 1. Request notification permission
     const permission = await Notification.requestPermission();
@@ -57,11 +66,14 @@ export const registerNotifications = async (email: string) => {
       
       // 4. Save token to Node API endpoint
       try {
-        await fetch(REGISTER_TOKEN_ENDPOINT, {
+        const res = await fetch(REGISTER_TOKEN_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, token })
         });
+        if (res.ok) {
+          localStorage.setItem(cacheKey, token);
+        }
       } catch (e) { 
         console.warn('Node token registration failed:', e); 
       }
