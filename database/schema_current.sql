@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS leads (
     createdAt VARCHAR(50) NOT NULL,
     assignedToEmail VARCHAR(255),
     assignedByEmail VARCHAR(255),
+    assignedAt VARCHAR(50),
+    isUpdatedByAssignee TINYINT(1) DEFAULT 0,
     departmentId VARCHAR(50),
     projectId VARCHAR(50),
     customerCode VARCHAR(100),

@@ -45,6 +45,17 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     setVisibleCount(30);
   }, [searchTerm, currentTab, assignFilter, selectedProjectId, selectedDeptId]);
 
+  const [, setTick] = useState(0);
+
+  // Live 1-second ticker for active lead countdown timer
+  useEffect(() => {
+    if (!selectedLead || !selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee) return;
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [selectedLead]);
+
   const [newNote, setNewNote] = useState('');
   const [newLead, setNewLead] = useState<Partial<Lead>>({
     customerName: '',
@@ -1171,6 +1182,39 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     </div>
                   </div>
                 </section>
+
+                {/* 10-Minute Lead Update Countdown Banner */}
+                {(() => {
+                  if (!selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee || !selectedLead.assignedAt) return null;
+                  const assignedTime = new Date(selectedLead.assignedAt).getTime();
+                  if (isNaN(assignedTime)) return null;
+
+                  const elapsedSec = Math.floor((Date.now() - assignedTime) / 1000);
+                  const remainingSec = Math.max(0, 10 * 60 - elapsedSec);
+                  const mins = Math.floor(remainingSec / 60);
+                  const secs = remainingSec % 60;
+                  const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                  const isDanger = remainingSec <= 120;
+
+                  return (
+                    <div className={`p-4 rounded-2xl border flex items-center justify-between mb-6 ${
+                      isDanger ? 'bg-rose-50 border-rose-200 text-rose-900 animate-pulse' : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <Clock className={`w-5 h-5 ${isDanger ? 'text-rose-600' : 'text-amber-600'}`} />
+                        <div>
+                          <p className="font-bold text-sm">Hạn cập nhật thông tin khách hàng</p>
+                          <p className="text-xs opacity-90">Vui lòng cập nhật thông tin trong <strong className="font-mono font-bold text-amber-950">{formatted}</strong> phút</p>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                        isDanger ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
+                      }`}>
+                        {formatted}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Cập nhật thông tin</h4>

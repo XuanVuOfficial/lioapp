@@ -6,7 +6,7 @@ const parseLead = (row: any): Lead => {
   if (lead.history) {
     try {
       lead.history = typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history;
-    } catch(e) { lead.history = []; }
+    } catch (e) { lead.history = []; }
   } else {
     lead.history = [];
   }
@@ -22,16 +22,18 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
     createdAt: now,
     updatedAt: now,
     assignedByEmail: lead.assignedToEmail ? lead.creatorEmail : undefined,
+    assignedAt: lead.assignedToEmail ? now : undefined,
+    isUpdatedByAssignee: false,
     history: [
       `[LOG][${new Date(now).toLocaleString('vi-VN')}] ${lead.creatorEmail}: Tạo mới khách hàng`,
       ...(lead.history || [])
     ]
   };
-  
+
   const data = Object.fromEntries(
     Object.entries(newLead).filter(([_, v]) => v !== undefined)
   );
-  
+
   const cols = Object.keys(data).join(', ');
   const vals = Object.values(data).map(v => escapeSQL(v)).join(', ');
   await executeMutation('leads', 'CREATE', newLead, `INSERT INTO leads (${cols}) VALUES (${vals})`);
@@ -63,7 +65,7 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
     const data = await queryDB(`SELECT customerName, assignedToEmail, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
     if (data && data.length > 0) {
       if (data[0].history) {
-        try { currentHistory = typeof data[0].history === 'string' ? JSON.parse(data[0].history) : data[0].history; } catch(e){ currentHistory = []; }
+        try { currentHistory = typeof data[0].history === 'string' ? JSON.parse(data[0].history) : data[0].history; } catch (e) { currentHistory = []; }
       }
       if (!customerName) customerName = data[0].customerName;
       if (!assignedEmail) assignedEmail = data[0].assignedToEmail;
@@ -85,7 +87,12 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
     history: newHistory
   };
 
-  const setClause = Object.entries(updateData).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+  // If the assigned salesperson updates the lead, mark isUpdatedByAssignee = true to stop countdown
+  if (assignedEmail && userEmail.toLowerCase() === assignedEmail.toLowerCase()) {
+    updateData.isUpdatedByAssignee = true;
+  }
+
+  const setClause = Object.entries(updateData).filter(([k, v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
   if (setClause) {
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
@@ -110,16 +117,16 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   const dataList = await queryDB(`SELECT customerName, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
   let currentHistory: string[] = [];
   let customerName = 'Khách hàng';
-  
+
   if (dataList && dataList.length > 0) {
     if (dataList[0].history) {
-      try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch(e){}
+      try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch (e) { }
     }
     if (dataList[0].customerName) {
       customerName = dataList[0].customerName;
     }
   }
-  
+
   const timestamp = new Date(now).toLocaleString('vi-VN');
   let actionText = `Giao khách hàng`;
   if (assignedToEmail) actionText += ` cho ${assignedToEmail}`;
@@ -132,16 +139,18 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   const updateData: any = {
     updatedAt: now,
     updatedByEmail: userEmail,
-    history: newHistory
+    history: newHistory,
+    assignedAt: now,
+    isUpdatedByAssignee: false
   };
-  
+
   if (assignedToEmail !== undefined) {
     updateData.assignedToEmail = assignedToEmail;
     updateData.assignedByEmail = userEmail;
   }
   if (departmentId !== undefined) updateData.departmentId = departmentId;
 
-  const setClause = Object.entries(updateData).filter(([k,v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
+  const setClause = Object.entries(updateData).filter(([k, v]) => v !== undefined).map(([k, v]) => `${k} = ${escapeSQL(v)}`).join(', ');
   if (setClause) {
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
@@ -176,7 +185,7 @@ export const subscribeToLeads = (role: UserRole, email: string, departmentIds: s
 
   return subscribeDB(sql, (data: any[]) => {
     let leads = data.map(parseLead);
-    
+
     if (['tgd', 'admin'].includes(role)) {
       // Sees everything
     } else if (['gds', 'tp'].includes(role)) {
@@ -184,12 +193,12 @@ export const subscribeToLeads = (role: UserRole, email: string, departmentIds: s
         leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
       }
     } else if (role === 'staff') {
-      leads = leads.filter(l => 
+      leads = leads.filter(l =>
         (departmentIds && l.departmentId && departmentIds.includes(l.departmentId)) &&
         (l.assignedToEmail === email || l.creatorEmail === email)
       );
     }
-    
+
     callback(leads);
   }, 5000);
 };

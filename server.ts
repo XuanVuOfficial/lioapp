@@ -533,6 +533,113 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Express server running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   });
+
+  // Run auto-revoke check every 30 seconds
+  setInterval(checkAndRevokeOverdueLeads, 30 * 1000);
+  setTimeout(checkAndRevokeOverdueLeads, 3000);
+}
+
+async function checkAndRevokeOverdueLeads() {
+  try {
+    // 1. Ensure assignedAt & isUpdatedByAssignee columns exist in MySQL leads table
+    await dbPool.query(`
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS assignedAt VARCHAR(50);
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS isUpdatedByAssignee TINYINT(1) DEFAULT 0;
+    `).catch(() => {});
+
+    // 2. Find leads assigned > 10 minutes ago where isUpdatedByAssignee is false/0
+    const [rows] = await dbPool.query<mysql.RowDataPacket[]>(`
+      SELECT id, customerName, phone, assignedToEmail, assignedByEmail, creatorEmail, assignedAt, history 
+      FROM leads 
+      WHERE assignedToEmail IS NOT NULL 
+        AND assignedToEmail != '' 
+        AND (isUpdatedByAssignee IS NULL OR isUpdatedByAssignee = 0)
+        AND assignedAt IS NOT NULL
+        AND assignedAt != ''
+    `);
+
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    const nowTime = Date.now();
+    const TEN_MINUTES_MS = 10 * 60 * 1000;
+
+    for (const lead of rows) {
+      const assignedTime = new Date(lead.assignedAt).getTime();
+      if (!isNaN(assignedTime) && (nowTime - assignedTime) >= TEN_MINUTES_MS) {
+        const revokedEmail = lead.assignedToEmail;
+        const assignerEmail = lead.assignedByEmail || lead.creatorEmail;
+        const customerName = lead.customerName || 'Khách hàng';
+        const phone = lead.phone || '';
+        const nowIso = new Date().toISOString();
+        const timestamp = new Date(nowIso).toLocaleString('vi-VN');
+
+        let historyList: string[] = [];
+        if (lead.history) {
+          try {
+            historyList = typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history;
+          } catch(e) {}
+        }
+        if (!Array.isArray(historyList)) historyList = [];
+
+        const revokeLog = `[LOG][${timestamp}] Hệ thống: Đã thu hồi vì quá hạn ${revokedEmail}`;
+        historyList.push(revokeLog);
+
+        // Revoke lead assignment in MySQL
+        await dbPool.query(
+          'UPDATE leads SET assignedToEmail = NULL, assignedByEmail = NULL, isUpdatedByAssignee = 0, history = ?, updatedAt = ?, updatedByEmail = ? WHERE id = ?',
+          [JSON.stringify(historyList), nowIso, 'system_auto_revoke', lead.id]
+        );
+
+        console.log(`[Auto-Revoke Cron] Revoked lead ${lead.id} (${customerName}) from ${revokedEmail} due to 10-minute timeout.`);
+
+        // Send FCM Push Notifications
+        try {
+          const messagingAdmin = getFirebaseAdminMessaging();
+          if (messagingAdmin) {
+            const tokens = await loadFcmTokens();
+
+            // 1. Send push to revoked staff
+            const revokedTokens = tokens.filter(t => t.email.toLowerCase() === revokedEmail.toLowerCase());
+            for (const tItem of revokedTokens) {
+              messagingAdmin.send({
+                token: tItem.token,
+                notification: {
+                  title: 'Thu hồi khách hàng ⚠️',
+                  body: `Bạn đã bị thu hồi khách hàng ${customerName} (${phone}) do quá 10 phút không cập nhật thông tin.`
+                },
+                data: {
+                  title: 'Thu hồi khách hàng ⚠️',
+                  body: `Bạn đã bị thu hồi khách hàng ${customerName} (${phone}) do quá 10 phút không cập nhật thông tin.`
+                }
+              }).catch(() => {});
+            }
+
+            // 2. Send push to assigner to reassign
+            if (assignerEmail && assignerEmail.toLowerCase() !== revokedEmail.toLowerCase()) {
+              const assignerTokens = tokens.filter(t => t.email.toLowerCase() === assignerEmail.toLowerCase());
+              for (const aItem of assignerTokens) {
+                messagingAdmin.send({
+                  token: aItem.token,
+                  notification: {
+                    title: 'Khách hàng bị thu hồi - Cần chia lại 🔄',
+                    body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 10 phút. Vui lòng vào phân công lại.`
+                  },
+                  data: {
+                    title: 'Khách hàng bị thu hồi - Cần chia lại 🔄',
+                    body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 10 phút. Vui lòng vào phân công lại.`
+                  }
+                }).catch(() => {});
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[Auto-Revoke Cron] Error sending push notification:', e);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Auto-Revoke Cron] Error running checkAndRevokeOverdueLeads:', err);
+  }
 }
 
 startServer();

@@ -43,6 +43,8 @@ export interface Lead {
   createdAt: string;
   assignedToEmail?: string;
   assignedByEmail?: string;
+  assignedAt?: string;
+  isUpdatedByAssignee?: boolean;
   departmentId?: string;
   projectId?: string;
   customerCode?: string;
