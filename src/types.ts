@@ -1,0 +1,91 @@
+declare global {
+  const __APP_VERSION__: string;
+}
+
+export type UserRole = 'tgd' | 'admin' | 'gds' | 'tp' | 'staff';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  departmentId?: string;
+  password?: string;
+  managedDeptIds?: string[];
+  createdAt?: number;
+  createdBy?: string;
+  updatedAt?: number;
+  avatarUrl?: string;
+  mustChangePassword?: boolean;
+  hireDate?: string;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  managerEmail: string;
+  managerName: string;
+  parentId?: string;
+  level: number;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  abbreviation: string;
+  createdAt: string;
+  createdByEmail: string;
+}
+
+export interface Lead {
+  id: string;
+  creatorEmail: string;
+  createdAt: string;
+  assignedToEmail?: string;
+  assignedByEmail?: string;
+  departmentId?: string;
+  projectId?: string;
+  customerCode?: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  status: string;
+  subStatus?: string;
+  appointmentStatus?: string;
+  resultStatus?: string;
+  details?: string;
+  updatedAt: string;
+  updatedByEmail: string;
+  imageUrl?: string;
+  interestLevel?: string;
+  notes?: string;
+  history: string[];
+}
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string;
+    email?: string;
+    emailVerified?: boolean;
+    isAnonymous?: boolean;
+    tenantId?: string | null;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}

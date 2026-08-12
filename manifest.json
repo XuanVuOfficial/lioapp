@@ -1,0 +1,21 @@
+{
+  "name": "HKTT",
+  "short_name": "HKTT",
+  "description": "Quản lý quy trình bán hàng chuyên nghiệp.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "https://thienlong.pro.vn/khachhang/icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "https://thienlong.pro.vn/khachhang/icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
