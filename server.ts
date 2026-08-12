@@ -467,11 +467,13 @@ async function startServer() {
 
   // Vite development middleware or static production serving
   const distPath = path.join(process.cwd(), 'dist');
+  const publicPath = path.join(process.cwd(), 'public');
   const isProduction = process.env.NODE_ENV === 'production' || (fs.existsSync(path.join(distPath, 'index.html')) && process.env.NODE_ENV !== 'development');
 
   if (isProduction) {
     console.log('[Server] Serving static production build from:', distPath);
     app.use(express.static(distPath));
+    app.use(express.static(publicPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
