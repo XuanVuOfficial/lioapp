@@ -150,24 +150,104 @@ interface UserFcmToken {
 
 const TOKENS_FILE = path.join(process.cwd(), 'user_fcm_tokens.json');
 
-function loadFcmTokens(): UserFcmToken[] {
+async function loadFcmTokens(): Promise<UserFcmToken[]> {
+  try {
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS user_fcm_tokens (
+        id VARCHAR(50) PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        token TEXT NOT NULL,
+        updatedAt VARCHAR(50) NOT NULL
+      )
+    `);
+
+    const [rows] = await dbPool.query<mysql.RowDataPacket[]>('SELECT id, email, token, updatedAt FROM user_fcm_tokens');
+    if (Array.isArray(rows) && rows.length > 0) {
+      return rows.map(r => ({
+        id: String(r.id),
+        email: String(r.email),
+        token: String(r.token),
+        updatedAt: String(r.updatedAt),
+      }));
+    }
+  } catch (err) {
+    console.warn('[MySQL Notifications] Loading tokens from DB warning:', err);
+  }
+
+  // Fallback to JSON file
   try {
     if (fs.existsSync(TOKENS_FILE)) {
       const content = fs.readFileSync(TOKENS_FILE, 'utf8');
       return JSON.parse(content) || [];
     }
-  } catch (err) {
-    console.error('[Node Notifications] Error reading tokens file:', err);
-  }
+  } catch (err) {}
   return [];
 }
 
-function saveFcmTokens(tokens: UserFcmToken[]) {
+async function saveFcmToken(cleanEmail: string, cleanToken: string) {
+  const now = new Date().toISOString();
+  const tokenId = 'fcm_' + Math.random().toString(36).substring(2, 10);
+
+  // 1. Save to MySQL user_fcm_tokens table
   try {
-    fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2), 'utf8');
-  } catch (err) {
-    console.error('[Node Notifications] Error writing tokens file:', err);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS user_fcm_tokens (
+        id VARCHAR(50) PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        token TEXT NOT NULL,
+        updatedAt VARCHAR(50) NOT NULL
+      )
+    `);
+
+    const [existing] = await dbPool.query<mysql.RowDataPacket[]>(
+      'SELECT id FROM user_fcm_tokens WHERE email = ? AND token = ?',
+      [cleanEmail, cleanToken]
+    );
+
+    if (Array.isArray(existing) && existing.length > 0) {
+      await dbPool.query('UPDATE user_fcm_tokens SET updatedAt = ? WHERE id = ?', [now, existing[0].id]);
+    } else {
+      await dbPool.query(
+        'INSERT INTO user_fcm_tokens (id, email, token, updatedAt) VALUES (?, ?, ?, ?)',
+        [tokenId, cleanEmail, cleanToken, now]
+      );
+    }
+    console.log(`[MySQL Notifications] Token saved to user_fcm_tokens table for ${cleanEmail}`);
+  } catch (err: any) {
+    console.error('[MySQL Notifications] Error saving to user_fcm_tokens table:', err?.message || err);
   }
+
+  // 2. Also sync to local JSON file backup
+  try {
+    let fileTokens: UserFcmToken[] = [];
+    if (fs.existsSync(TOKENS_FILE)) {
+      fileTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8')) || [];
+    }
+    const idx = fileTokens.findIndex(t => t.email === cleanEmail && t.token === cleanToken);
+    if (idx >= 0) {
+      fileTokens[idx].updatedAt = now;
+    } else {
+      fileTokens.push({ id: tokenId, email: cleanEmail, token: cleanToken, updatedAt: now });
+    }
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify(fileTokens, null, 2), 'utf8');
+  } catch (err) {}
+}
+
+async function deleteFcmTokens(staleIds: string[]) {
+  if (!staleIds || staleIds.length === 0) return;
+  try {
+    for (const id of staleIds) {
+      await dbPool.query('DELETE FROM user_fcm_tokens WHERE id = ?', [id]);
+    }
+  } catch (err) {}
+
+  try {
+    if (fs.existsSync(TOKENS_FILE)) {
+      let fileTokens: UserFcmToken[] = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8')) || [];
+      fileTokens = fileTokens.filter(t => !staleIds.includes(t.id));
+      fs.writeFileSync(TOKENS_FILE, JSON.stringify(fileTokens, null, 2), 'utf8');
+    }
+  } catch (err) {}
 }
 
 async function startServer() {
@@ -203,7 +283,7 @@ async function startServer() {
   // --- Node Notification API Routes ---
 
   // 1. Register or update FCM token
-  app.post('/api/notifications/register-token', (req, res) => {
+  app.post('/api/notifications/register-token', async (req, res) => {
     const { email, token } = req.body || {};
 
     if (!email || !token) {
@@ -215,37 +295,19 @@ async function startServer() {
 
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanToken = String(token).trim();
-    const now = new Date().toISOString();
 
-    let tokens = loadFcmTokens();
-    const existingIndex = tokens.findIndex(
-      t => t.email === cleanEmail && t.token === cleanToken
-    );
+    await saveFcmToken(cleanEmail, cleanToken);
 
-    if (existingIndex >= 0) {
-      tokens[existingIndex].updatedAt = now;
-    } else {
-      tokens.push({
-        id: 'fcm_' + Math.random().toString(36).substring(2, 10),
-        email: cleanEmail,
-        token: cleanToken,
-        updatedAt: now,
-      });
-    }
-
-    saveFcmTokens(tokens);
-
-    console.log(`[Node Notifications] Token registered for ${cleanEmail}`);
     return res.json({
       success: true,
-      message: 'Đã lưu FCM token thành công (Node)',
+      message: 'Đã lưu FCM token vào MySQL table user_fcm_tokens thành công',
       email: cleanEmail,
     });
   });
 
   // 2. Get registered tokens
-  app.get('/api/notifications/tokens', (req, res) => {
-    const tokens = loadFcmTokens();
+  app.get('/api/notifications/tokens', async (req, res) => {
+    const tokens = await loadFcmTokens();
     return res.json({
       success: true,
       count: tokens.length,
@@ -284,7 +346,7 @@ async function startServer() {
         });
       }
 
-      let allTokens = loadFcmTokens();
+      let allTokens = await loadFcmTokens();
       let targetTokens = isSendToAll
         ? allTokens
         : allTokens.filter(t => recipientEmails.includes(t.email));
@@ -380,8 +442,7 @@ async function startServer() {
 
       // Prune stale tokens if any
       if (staleTokenIds.length > 0) {
-        const remainingTokens = allTokens.filter(t => !staleTokenIds.includes(t.id));
-        saveFcmTokens(remainingTokens);
+        await deleteFcmTokens(staleTokenIds);
       }
 
       return res.json({
