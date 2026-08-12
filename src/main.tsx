@@ -4,11 +4,11 @@ import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
-// Register PWA service worker with auto-update & auto-refresh
+// Register PWA service worker with autoUpdate mode
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    console.log('[PWA] New version detected! Automatically updating and reloading...');
+    console.log('[PWA] New version detected by Workbox.');
     updateSW(true);
   },
   onOfflineReady() {
@@ -16,35 +16,25 @@ const updateSW = registerSW({
   }
 });
 
-// Auto-reload page when new service worker takes over
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      console.log('[PWA] Controller changed. Reloading page for new version...');
-      window.location.reload();
-    }
-  });
+// Check version upgrade in localStorage to clear old cache on version bump
+const currentVersion = (window as any).__APP_VERSION__ || '0.0.0';
+const savedVersion = localStorage.getItem('hktt_app_version');
 
-  // Periodically check for updates every 5 minutes and when app becomes visible
-  const checkUpdate = () => {
-    navigator.serviceWorker.ready.then((registration) => {
-      registration.update().catch(() => {});
+if (savedVersion && savedVersion !== currentVersion) {
+  console.log(`%c [PWA Upgrade] ${savedVersion} -> ${currentVersion} `, 'background: #059669; color: #fff; font-weight: bold;');
+  localStorage.setItem('hktt_app_version', currentVersion);
+  if (typeof window !== 'undefined' && 'caches' in window) {
+    caches.keys().then((names) => {
+      names.forEach((name) => {
+        caches.delete(name);
+      });
     });
-  };
-
-  setInterval(checkUpdate, 5 * 60 * 1000);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      checkUpdate();
-    }
-  });
+  }
+} else if (!savedVersion) {
+  localStorage.setItem('hktt_app_version', currentVersion);
 }
 
-// Log application version
-const appVersion = (window as any).__APP_VERSION__ || '0.0.0';
-console.log(`%c SalesPro CRM v${appVersion} `, 'background: #059669; color: #fff; font-weight: bold;');
+console.log(`%c HKTT CRM v${currentVersion} `, 'background: #059669; color: #fff; font-weight: bold;');
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
