@@ -37,8 +37,6 @@ dbPool.getConnection()
   });
 
 // Initialize Firebase Admin SDK for Node FCM notifications
-let messagingAdmin: Messaging | null = null;
-
 function getServiceAccount() {
   // 1. Try reading service-account.json from filesystem
   const saPaths = [
@@ -81,37 +79,42 @@ function getServiceAccount() {
   };
 }
 
-try {
-  const saContent = getServiceAccount();
+function getFirebaseAdminMessaging(): Messaging | null {
+  try {
+    const saContent = getServiceAccount();
+    if (!saContent || !saContent.private_key) {
+      console.warn('[Node Notifications] Warning: No service account credentials found.');
+      return null;
+    }
 
-  if (saContent) {
     const projectId = saContent.project_id || process.env.FIREBASE_PROJECT_ID || 'tets-14775';
+    const clientEmail = saContent.client_email || saContent.clientEmail || 'firebase-adminsdk-o2eam@tets-14775.iam.gserviceaccount.com';
+    const rawKey = String(saContent.private_key || saContent.privateKey);
+    const privateKey = rawKey.replace(/\\n/g, '\n');
+
     process.env.GOOGLE_CLOUD_PROJECT = projectId;
     process.env.GCP_PROJECT = projectId;
 
-    if (!getApps().length) {
-      initializeApp({
-        credential: cert(saContent),
-        projectId: projectId,
-      });
-    }
-    messagingAdmin = getMessaging();
-    console.log(`[Node Notifications] Firebase Admin initialized successfully for project: ${projectId}`);
-  } else {
-    const projectId = process.env.FIREBASE_PROJECT_ID || 'tets-14775';
-    process.env.GOOGLE_CLOUD_PROJECT = projectId;
-    process.env.GCP_PROJECT = projectId;
+    const existingApps = getApps();
+    let app = existingApps.find(a => a.name === 'hktt_admin');
 
-    if (!getApps().length) {
-      initializeApp({
+    if (!app) {
+      app = initializeApp({
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
         projectId: projectId,
-      });
+      }, 'hktt_admin');
+      console.log(`[Node Notifications] Dedicated Firebase Admin initialized for project: ${projectId}`);
     }
-    messagingAdmin = getMessaging();
-    console.log('[Node Notifications] Firebase Admin initialized with default credentials.');
+
+    return getMessaging(app);
+  } catch (err: any) {
+    console.error('[Node Notifications] Firebase Admin init error:', err?.message || err);
+    return null;
   }
-} catch (err) {
-  console.warn('[Node Notifications] Firebase Admin initialization warning:', err);
 }
 
 // Token storage in persistent JSON file
@@ -273,6 +276,7 @@ async function startServer() {
         });
       }
 
+      const messagingAdmin = getFirebaseAdminMessaging();
       if (!messagingAdmin) {
         return res.status(500).json({
           success: false,
