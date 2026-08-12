@@ -361,10 +361,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       }
     }
 
-    const history = [];
-    if (newLead.notes) {
-      history.push(`[NOTE][${new Date().toLocaleString()}] ${user.displayName || user.email}: ${newLead.notes}`);
-    }
+    const history: string[] = [];
 
     // If staff creates a lead, assign it to them by default if not specified
     const finalAssignedToEmail = newLead.assignedToEmail || (user.role === 'staff' ? user.email : '');
