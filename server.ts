@@ -345,8 +345,8 @@ async function startServer() {
               notification: {
                 title: String(title),
                 body: String(body),
-                icon: 'https://thienlong.pro.vn/khachhang/icon.jpg',
-                badge: 'https://thienlong.pro.vn/khachhang/icon.jpg',
+                icon: 'https://thienlong.pro.vn/icon.jpg',
+                badge: 'https://thienlong.pro.vn/icon.jpg',
                 requireInteraction: true,
               },
               fcmOptions: {

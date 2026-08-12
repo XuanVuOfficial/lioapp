@@ -80,8 +80,8 @@ export const registerNotifications = async (email: string) => {
         const title = payload.notification.title || 'HKTT CRM';
         const options: NotificationOptions = {
           body: payload.notification.body || '',
-          icon: 'https://thienlong.pro.vn/khachhang/icon.jpg',
-          badge: 'https://thienlong.pro.vn/khachhang/icon.jpg',
+          icon: 'https://thienlong.pro.vn/icon.jpg',
+          badge: 'https://thienlong.pro.vn/icon.jpg',
           data: payload.data || {}
         };
         
