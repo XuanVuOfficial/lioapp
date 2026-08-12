@@ -29,18 +29,40 @@ export default defineConfig(({ mode }) => {
               src: '/pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
             },
             {
               src: '/pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable'
             },
             {
               src: 'https://thienlong.pro.vn/icon.jpg',
               sizes: '250x250',
               type: 'image/jpeg'
+            }
+          ],
+          screenshots: [
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              form_factor: 'wide',
+              label: 'HKTT CRM Desktop Dashboard'
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              form_factor: 'narrow',
+              label: 'HKTT CRM Mobile App'
             }
           ]
         }

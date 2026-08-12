@@ -470,6 +470,14 @@ async function startServer() {
   const publicPath = path.join(process.cwd(), 'public');
   const isProduction = process.env.NODE_ENV === 'production' || (fs.existsSync(path.join(distPath, 'index.html')) && process.env.NODE_ENV !== 'development');
 
+  app.get(['/manifest.json', '/manifest.webmanifest'], (req, res) => {
+    const manifestPath = fs.existsSync(path.join(distPath, 'manifest.webmanifest'))
+      ? path.join(distPath, 'manifest.webmanifest')
+      : path.join(publicPath, 'manifest.json');
+    res.setHeader('Content-Type', 'application/manifest+json');
+    return res.sendFile(manifestPath);
+  });
+
   if (isProduction) {
     console.log('[Server] Serving static production build from:', distPath);
     app.use(express.static(distPath));
