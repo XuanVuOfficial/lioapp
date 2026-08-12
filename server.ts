@@ -148,8 +148,6 @@ interface UserFcmToken {
   updatedAt: string;
 }
 
-const TOKENS_FILE = path.join(process.cwd(), 'user_fcm_tokens.json');
-
 async function loadFcmTokens(): Promise<UserFcmToken[]> {
   try {
     await dbPool.query(`
@@ -162,7 +160,8 @@ async function loadFcmTokens(): Promise<UserFcmToken[]> {
     `);
 
     const [rows] = await dbPool.query<mysql.RowDataPacket[]>('SELECT id, email, token, updatedAt FROM user_fcm_tokens');
-    if (Array.isArray(rows) && rows.length > 0) {
+    if (Array.isArray(rows)) {
+      console.log(`[MySQL Notifications] Loaded ${rows.length} tokens directly from MySQL table user_fcm_tokens.`);
       return rows.map(r => ({
         id: String(r.id),
         email: String(r.email),
@@ -171,16 +170,8 @@ async function loadFcmTokens(): Promise<UserFcmToken[]> {
       }));
     }
   } catch (err) {
-    console.warn('[MySQL Notifications] Loading tokens from DB warning:', err);
+    console.error('[MySQL Notifications] Error reading from MySQL table user_fcm_tokens:', err);
   }
-
-  // Fallback to JSON file
-  try {
-    if (fs.existsSync(TOKENS_FILE)) {
-      const content = fs.readFileSync(TOKENS_FILE, 'utf8');
-      return JSON.parse(content) || [];
-    }
-  } catch (err) {}
   return [];
 }
 
@@ -188,7 +179,6 @@ async function saveFcmToken(cleanEmail: string, cleanToken: string) {
   const now = new Date().toISOString();
   const tokenId = 'fcm_' + Math.random().toString(36).substring(2, 10);
 
-  // 1. Save to MySQL user_fcm_tokens table
   try {
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS user_fcm_tokens (
@@ -206,31 +196,18 @@ async function saveFcmToken(cleanEmail: string, cleanToken: string) {
 
     if (Array.isArray(existing) && existing.length > 0) {
       await dbPool.query('UPDATE user_fcm_tokens SET updatedAt = ? WHERE id = ?', [now, existing[0].id]);
+      console.log(`[MySQL Notifications] Updated token timestamp for ${cleanEmail} in user_fcm_tokens table.`);
     } else {
       await dbPool.query(
         'INSERT INTO user_fcm_tokens (id, email, token, updatedAt) VALUES (?, ?, ?, ?)',
         [tokenId, cleanEmail, cleanToken, now]
       );
+      console.log(`[MySQL Notifications] INSERTED new FCM token for ${cleanEmail} into user_fcm_tokens table!`);
     }
-    console.log(`[MySQL Notifications] Token saved to user_fcm_tokens table for ${cleanEmail}`);
   } catch (err: any) {
-    console.error('[MySQL Notifications] Error saving to user_fcm_tokens table:', err?.message || err);
+    console.error('[MySQL Notifications] Error inserting/updating MySQL user_fcm_tokens table:', err?.message || err);
+    throw err;
   }
-
-  // 2. Also sync to local JSON file backup
-  try {
-    let fileTokens: UserFcmToken[] = [];
-    if (fs.existsSync(TOKENS_FILE)) {
-      fileTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8')) || [];
-    }
-    const idx = fileTokens.findIndex(t => t.email === cleanEmail && t.token === cleanToken);
-    if (idx >= 0) {
-      fileTokens[idx].updatedAt = now;
-    } else {
-      fileTokens.push({ id: tokenId, email: cleanEmail, token: cleanToken, updatedAt: now });
-    }
-    fs.writeFileSync(TOKENS_FILE, JSON.stringify(fileTokens, null, 2), 'utf8');
-  } catch (err) {}
 }
 
 async function deleteFcmTokens(staleIds: string[]) {
@@ -238,16 +215,11 @@ async function deleteFcmTokens(staleIds: string[]) {
   try {
     for (const id of staleIds) {
       await dbPool.query('DELETE FROM user_fcm_tokens WHERE id = ?', [id]);
+      console.log(`[MySQL Notifications] Deleted stale token ${id} from MySQL user_fcm_tokens table.`);
     }
-  } catch (err) {}
-
-  try {
-    if (fs.existsSync(TOKENS_FILE)) {
-      let fileTokens: UserFcmToken[] = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8')) || [];
-      fileTokens = fileTokens.filter(t => !staleIds.includes(t.id));
-      fs.writeFileSync(TOKENS_FILE, JSON.stringify(fileTokens, null, 2), 'utf8');
-    }
-  } catch (err) {}
+  } catch (err) {
+    console.error('[MySQL Notifications] Delete stale tokens error:', err);
+  }
 }
 
 async function startServer() {

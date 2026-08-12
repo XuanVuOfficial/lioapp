@@ -31,7 +31,12 @@ export const registerNotifications = async (email: string) => {
   const cachedToken = localStorage.getItem(cacheKey);
 
   if (cachedToken && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    console.log(`[FCM] Device already registered for ${email}. Skipping duplicate registration.`);
+    console.log(`[FCM] Device registered in cache for ${email}. Background syncing to MySQL...`);
+    fetch(REGISTER_TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token: cachedToken })
+    }).catch(() => {});
     return;
   }
 
