@@ -100,7 +100,7 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
         className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8"
       >
         <div className="text-center mb-8">
-          <img src="/icon.jpg" alt="HKTT Icon" className="w-16 h-16 rounded-2xl mx-auto mb-6 object-cover shadow-lg shadow-emerald-100" />
+          <img src="https://thienlong.pro.vn/icon.jpg" alt="HKTT Icon" className="w-16 h-16 rounded-2xl mx-auto mb-6 object-cover shadow-lg shadow-emerald-100" />
           <h1 className="text-3xl font-bold text-slate-900 mb-2">HKTT</h1>
           <p className="text-slate-600">
             {requirePasswordChange ? 'Đổi mật khẩu bảo mật' : 'Đăng nhập để quản lý quy trình bán hàng.'}

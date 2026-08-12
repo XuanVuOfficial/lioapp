@@ -149,7 +149,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
       {/* Mobile Top Header */}
       <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-2">
-          <img src="/icon.jpg" alt="HKTT Icon" className="w-8 h-8 rounded-lg object-cover" />
+          <img src="https://thienlong.pro.vn/icon.jpg" alt="HKTT Icon" className="w-8 h-8 rounded-lg object-cover" />
           <h1 className="text-lg font-bold text-slate-900">HKTT</h1>
         </div>
         <button 
@@ -168,7 +168,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <div className="hidden md:flex items-center gap-2 mb-8 px-2">
-            <img src="/icon.jpg" alt="HKTT Icon" className="w-8 h-8 rounded-lg object-cover" />
+            <img src="https://thienlong.pro.vn/icon.jpg" alt="HKTT Icon" className="w-8 h-8 rounded-lg object-cover" />
             <h1 className="text-xl font-bold text-slate-900">HKTT</h1>
           </div>
 
