@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
-  const version = "1.0.4";
+  const version = "1.0.5";
 
   return {
     plugins: [
