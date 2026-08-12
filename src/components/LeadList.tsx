@@ -40,6 +40,12 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [exportEndDate, setExportEndDate] = useState<string>('');
   const [presetSelected, setPresetSelected] = useState<string>('month');
 
+  // Search Picker Modal State
+  const [searchPickerModal, setSearchPickerModal] = useState<{
+    type: 'project' | 'department' | 'staff' | null;
+    searchTerm: string;
+  }>({ type: null, searchTerm: '' });
+
   // Reset visible count when filters or search terms change to keep loading fast
   useEffect(() => {
     setVisibleCount(30);
