@@ -127,3 +127,13 @@ export const sendPushNotification = async (recipientEmail: string, title: string
     console.error('Error sending push notification via Node API:', error);
   }
 };
+
+/**
+ * Clear FCM registration cache on account logout
+ */
+export const unregisterNotifications = async (email: string) => {
+  if (typeof window === 'undefined') return;
+  const cacheKey = `fcm_registered_${email}`;
+  localStorage.removeItem(cacheKey);
+  console.log(`[FCM] Unregistered device cache for ${email}`);
+};

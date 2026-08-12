@@ -189,9 +189,13 @@ async function saveFcmToken(cleanEmail: string, cleanToken: string) {
       )
     `);
 
+    // 1. Purge any previous user account tokens registered on this physical device
+    await dbPool.query('DELETE FROM user_fcm_tokens WHERE token = ? AND LOWER(email) != ?', [cleanToken, cleanEmail]);
+
+    // 2. Update existing or insert new token record for current active user account
     const [existing] = await dbPool.query<mysql.RowDataPacket[]>(
-      'SELECT id FROM user_fcm_tokens WHERE email = ? AND token = ?',
-      [cleanEmail, cleanToken]
+      'SELECT id FROM user_fcm_tokens WHERE token = ? AND LOWER(email) = ?',
+      [cleanToken, cleanEmail]
     );
 
     if (Array.isArray(existing) && existing.length > 0) {
@@ -202,7 +206,7 @@ async function saveFcmToken(cleanEmail: string, cleanToken: string) {
         'INSERT INTO user_fcm_tokens (id, email, token, updatedAt) VALUES (?, ?, ?, ?)',
         [tokenId, cleanEmail, cleanToken, now]
       );
-      console.log(`[MySQL Notifications] INSERTED new FCM token for ${cleanEmail} into user_fcm_tokens table!`);
+      console.log(`[MySQL Notifications] Re-assigned FCM token exclusively to ${cleanEmail} in user_fcm_tokens table!`);
     }
   } catch (err: any) {
     console.error('[MySQL Notifications] Error inserting/updating MySQL user_fcm_tokens table:', err?.message || err);
