@@ -79,38 +79,62 @@ function getServiceAccount() {
   };
 }
 
+// Initialize Firebase Admin SDK for Node FCM notifications
+let globalMessagingInstance: Messaging | null = null;
+
 function getFirebaseAdminMessaging(): Messaging | null {
+  if (globalMessagingInstance) return globalMessagingInstance;
+
   try {
     const saContent = getServiceAccount();
-    if (!saContent || !saContent.private_key) {
-      console.warn('[Node Notifications] Warning: No service account credentials found.');
-      return null;
-    }
-
-    const projectId = saContent.project_id || process.env.FIREBASE_PROJECT_ID || 'tets-14775';
-    const clientEmail = saContent.client_email || saContent.clientEmail || 'firebase-adminsdk-o2eam@tets-14775.iam.gserviceaccount.com';
-    const rawKey = String(saContent.private_key || saContent.privateKey);
+    const projectId = saContent?.project_id || process.env.FIREBASE_PROJECT_ID || 'tets-14775';
+    const clientEmail = saContent?.client_email || saContent?.clientEmail || 'firebase-adminsdk-o2eam@tets-14775.iam.gserviceaccount.com';
+    const rawKey = String(saContent?.private_key || saContent?.privateKey || '');
     const privateKey = rawKey.replace(/\\n/g, '\n');
 
     process.env.GOOGLE_CLOUD_PROJECT = projectId;
     process.env.GCP_PROJECT = projectId;
 
-    const existingApps = getApps();
-    let app = existingApps.find(a => a.name === 'hktt_admin');
+    const certObj = {
+      projectId,
+      project_id: projectId,
+      clientEmail,
+      client_email: clientEmail,
+      privateKey,
+      private_key: privateKey,
+    };
 
-    if (!app) {
-      app = initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-        projectId: projectId,
-      }, 'hktt_admin');
-      console.log(`[Node Notifications] Dedicated Firebase Admin initialized for project: ${projectId}`);
+    // Ensure service-account.json is physically available on disk for Google Cloud Auth Library
+    const saPath = path.join(process.cwd(), 'service-account.json');
+    if (!fs.existsSync(saPath)) {
+      try {
+        fs.writeFileSync(saPath, JSON.stringify({
+          type: "service_account",
+          project_id: projectId,
+          private_key: privateKey,
+          client_email: clientEmail,
+        }, null, 2), 'utf8');
+      } catch (e) {}
+    }
+    if (fs.existsSync(saPath)) {
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = saPath;
     }
 
-    return getMessaging(app);
+    let app;
+    const adminApps = getApps();
+    const foundApp = adminApps.find(a => a.name === 'hktt_admin');
+    if (foundApp) {
+      app = foundApp;
+    } else {
+      app = initializeApp({
+        credential: cert(certObj),
+        projectId: projectId,
+      }, 'hktt_admin');
+    }
+
+    globalMessagingInstance = getMessaging(app);
+    console.log(`[Node Notifications] Dedicated Firebase Admin initialized for project: ${projectId}`);
+    return globalMessagingInstance;
   } catch (err: any) {
     console.error('[Node Notifications] Firebase Admin init error:', err?.message || err);
     return null;
