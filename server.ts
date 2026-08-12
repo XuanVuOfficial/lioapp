@@ -41,7 +41,6 @@ function getServiceAccount() {
   // 1. Try reading service-account.json from filesystem
   const saPaths = [
     path.join(process.cwd(), 'service-account.json'),
-    path.join(process.cwd(), 'public', 'hktt', 'service-account.json'),
   ];
   for (const saPath of saPaths) {
     if (fs.existsSync(saPath)) {

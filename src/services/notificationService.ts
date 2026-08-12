@@ -39,12 +39,14 @@ export const registerNotifications = async (email: string) => {
       return;
     }
 
-    // 2. Register FCM Service Worker
-    let registration = await navigator.serviceWorker.getRegistration('/');
+    // 2. Register FCM Service Worker explicitly
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    let registration = registrations.find(r => r.active?.scriptURL.includes('firebase-messaging-sw.js'));
+
     if (!registration) {
       try {
-        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-        console.log('Official FCM Service Worker registered at root:', registration);
+        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Official FCM Service Worker registered:', registration);
       } catch (swErr) {
         console.error('Service Worker registration failed:', swErr);
       }

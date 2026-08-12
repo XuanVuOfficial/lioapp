@@ -14,28 +14,56 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages via Firebase SDK
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Background message received:', payload);
+// Raw Push Event Handler for 100% Android & PC Notification Display Reliability
+self.addEventListener('push', (event) => {
+  console.log('[firebase-messaging-sw.js] Raw Push event received:', event);
 
-  const title = payload.notification?.title || payload.data?.title || 'HKTT CRM';
-  const body = payload.notification?.body || payload.data?.body || '';
-  const icon = payload.notification?.icon || payload.data?.icon || 'https://thienlong.pro.vn/icon.jpg';
-  const badge = payload.notification?.badge || payload.data?.badge || 'https://thienlong.pro.vn/icon.jpg';
-  const targetUrl = payload.data?.url || payload.data?.link || payload.fcmOptions?.link || '/';
+  let title = 'HKTT CRM';
+  let body = 'Bạn có thông báo mới!';
+  let icon = 'https://thienlong.pro.vn/icon.jpg';
+  let badge = 'https://thienlong.pro.vn/icon.jpg';
+  let url = 'https://thienlong.pro.vn';
+  let customData = {};
+
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      console.log('[firebase-messaging-sw.js] Parsed push payload:', payload);
+
+      const notif = payload.notification || payload.webpush?.notification || {};
+      const pData = payload.data || {};
+
+      title = notif.title || pData.title || title;
+      body = notif.body || pData.body || body;
+      icon = notif.icon || pData.icon || icon;
+      badge = notif.badge || pData.badge || badge;
+      url = pData.url || pData.link || payload.webpush?.fcmOptions?.link || url;
+      customData = pData;
+    } catch (e) {
+      body = event.data.text() || body;
+    }
+  }
 
   const notificationOptions = {
     body: body,
     icon: icon,
     badge: badge,
+    vibrate: [200, 100, 200],
     requireInteraction: true,
     data: {
-      ...(payload.data || {}),
-      url: targetUrl
+      ...customData,
+      url: url
     }
   };
 
-  return self.registration.showNotification(title, notificationOptions);
+  event.waitUntil(
+    self.registration.showNotification(title, notificationOptions)
+  );
+});
+
+// Handle background messages via Firebase SDK
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Background message received:', payload);
 });
 
 // Handle notification click event
@@ -57,4 +85,3 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
-
