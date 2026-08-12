@@ -70,36 +70,36 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
   }, [leads]);
 
   return (
-    <div className="space-y-8">
-      <header className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">Chào mừng trở lại, {user.displayName}</h1>
-        <p className="text-slate-500 mt-1 text-sm md:text-base">Đây là những gì đang diễn ra trong quy trình bán hàng của bạn hôm nay.</p>
+    <div className="space-y-4 md:space-y-6">
+      <header className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight">Chào mừng trở lại, {user.displayName}</h1>
+        <p className="text-slate-500 mt-1 text-xs md:text-sm">Đây là những gì đang diễn ra trong quy trình bán hàng của bạn hôm nay.</p>
       </header>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {stats.map((stat, i) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white p-3.5 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
           >
-            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center mb-3 md:mb-4 ${stat.color}`}>
-              <stat.icon className="w-5 h-5 md:w-6 md:h-6" />
+            <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center mb-2.5 md:mb-3 ${stat.color}`}>
+              <stat.icon className="w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <p className="text-[10px] md:text-sm font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
-            <p className="text-xl md:text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
+            <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
+            <p className="text-lg md:text-2xl font-bold text-slate-900 mt-0.5">{stat.value}</p>
           </motion.div>
         ))}
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+          className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm"
         >
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="w-5 h-5 text-emerald-600" />

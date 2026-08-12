@@ -1119,17 +1119,17 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         </div>
       )}
 
-      {/* Details Modal */}
+      {/* Details Modal - Full Screen on Mobile, Centered Modal on Tablet/Desktop */}
       {selectedLead && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full border border-slate-200 overflow-y-auto max-h-[90vh] flex flex-col relative">
-            <div className="sticky top-0 bg-white z-20 px-6 py-4 border-b border-slate-100 flex justify-between items-center shadow-sm">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 z-50">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-3xl md:rounded-2xl shadow-2xl border-0 md:border border-slate-200 overflow-y-auto flex flex-col relative">
+            <div className="sticky top-0 bg-white z-20 px-4 py-3 md:px-6 md:py-4 border-b border-slate-100 flex justify-between items-center shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
                   <User className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 leading-tight">{selectedLead.customerName}</h3>
+                  <h3 className="text-base md:text-lg font-bold text-slate-900 leading-tight">{selectedLead.customerName}</h3>
                   <p className="text-xs text-slate-500">
                     {selectedLead.customerCode ? `Mã KH: ${selectedLead.customerCode}` : `ID: ${selectedLead.id}`}
                   </p>
@@ -1140,8 +1140,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               </button>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-6">
+            <div className="p-3.5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              <div className="md:col-span-2 space-y-4 md:space-y-6">
                 <section>
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Thông tin liên hệ</h4>
                   <div className="bg-slate-50 p-4 rounded-xl space-y-4 mb-4">

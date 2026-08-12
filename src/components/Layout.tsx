@@ -245,7 +245,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-4 md:p-8 pb-24 md:pb-8">
+        <main className="flex-1 overflow-auto p-2.5 md:p-6 pb-20 md:pb-6">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
