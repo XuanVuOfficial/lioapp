@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
           skipWaiting: true,
           clientsClaim: true,
           cleanupOutdatedCaches: true,
+          importScripts: ['/fcm-sw-helper.js']
         },
         manifest: {
           id: '/',

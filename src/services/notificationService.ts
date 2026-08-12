@@ -39,17 +39,11 @@ export const registerNotifications = async (email: string) => {
       return;
     }
 
-    // 2. Register FCM Service Worker explicitly
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    let registration = registrations.find(r => r.active?.scriptURL.includes('firebase-messaging-sw.js'));
-
+    // 2. Obtain active unified PWA Service Worker (contains FCM push handler)
+    let registration: ServiceWorkerRegistration | undefined = await navigator.serviceWorker.ready;
     if (!registration) {
-      try {
-        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        console.log('Official FCM Service Worker registered:', registration);
-      } catch (swErr) {
-        console.error('Service Worker registration failed:', swErr);
-      }
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      registration = registrations[0];
     }
 
     // 3. Retrieve FCM Token from Firebase
