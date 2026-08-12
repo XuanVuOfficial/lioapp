@@ -85,16 +85,27 @@ try {
   const saContent = getServiceAccount();
 
   if (saContent) {
+    const projectId = saContent.project_id || process.env.FIREBASE_PROJECT_ID || 'tets-14775';
+    process.env.GOOGLE_CLOUD_PROJECT = projectId;
+    process.env.GCP_PROJECT = projectId;
+
     if (!getApps().length) {
       initializeApp({
         credential: cert(saContent),
+        projectId: projectId,
       });
     }
     messagingAdmin = getMessaging();
-    console.log('[Node Notifications] Firebase Admin initialized with service account key.');
+    console.log(`[Node Notifications] Firebase Admin initialized successfully for project: ${projectId}`);
   } else {
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'tets-14775';
+    process.env.GOOGLE_CLOUD_PROJECT = projectId;
+    process.env.GCP_PROJECT = projectId;
+
     if (!getApps().length) {
-      initializeApp();
+      initializeApp({
+        projectId: projectId,
+      });
     }
     messagingAdmin = getMessaging();
     console.log('[Node Notifications] Firebase Admin initialized with default credentials.');
