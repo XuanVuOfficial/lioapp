@@ -106,7 +106,7 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
             <h3 className="font-bold text-slate-900">Trạng thái khách hàng</h3>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={leadsByStatusData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -132,7 +132,7 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
             <h3 className="font-bold text-slate-900">Khách hàng mới (7 ngày qua)</h3>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={leadsOverTimeData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -157,7 +157,7 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
             <h3 className="font-bold text-slate-900">Phân bổ theo phòng ban</h3>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={leadsByDeptData}
