@@ -14,28 +14,33 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'prompt',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'icon.jpg', 'icon.png'],
         manifest: {
-          name: 'SalesPro CRM',
-          short_name: 'SalesPro',
-          description: 'Hệ thống quản lý khách hàng chuyên nghiệp',
+          id: '/',
+          name: 'HKTT CRM',
+          short_name: 'HKTT',
+          description: 'Hệ thống quản lý quy trình bán hàng chuyên nghiệp.',
           theme_color: '#059669',
+          background_color: '#f8fafc',
+          start_url: '/',
+          display: 'standalone',
           icons: [
             {
-              src: 'pwa-192x192.png',
+              src: '/pwa-192x192.png',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any maskable'
             },
             {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png'
-            },
-            {
-              src: 'pwa-512x512.png',
+              src: '/pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'
+            },
+            {
+              src: 'https://thienlong.pro.vn/icon.jpg',
+              sizes: '250x250',
+              type: 'image/jpeg'
             }
           ]
         }
