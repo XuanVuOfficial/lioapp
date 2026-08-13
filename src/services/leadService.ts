@@ -16,11 +16,11 @@ const parseLead = (row: any): Lead => {
 export const sendZaloNotification = async (email: string, message: string) => {
   if (!email || !message) return;
   try {
-    await fetch('/api/zalo/send', {
+    fetch('/api/zalo/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, message })
-    });
+    }).catch(err => console.error('Error sending Zalo notification fetch:', err));
   } catch (err) {
     console.error('Error sending Zalo notification:', err);
   }
@@ -51,20 +51,23 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
   const vals = Object.values(data).map(v => escapeSQL(v)).join(', ');
   await executeMutation('leads', 'CREATE', newLead, `INSERT INTO leads (${cols}) VALUES (${vals})`);
 
-  // Send push & Zalo notification to assigned employee
+  // Send push & Zalo notification asynchronously in background (non-blocking)
   if (newLead.assignedToEmail) {
-    try {
-      const { sendPushNotification } = await import('./notificationService');
-      await sendPushNotification(
-        newLead.assignedToEmail,
-        'Khách hàng mới được giao 💼',
-        `Bạn vừa được giao khách hàng ${newLead.customerName} bởi ${newLead.creatorEmail}`
-      );
-      const zaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${newLead.customerName}${newLead.phone ? ' - SĐT: ' + newLead.phone : ''}`;
-      await sendZaloNotification(newLead.assignedToEmail, zaloMsg);
-    } catch (err) {
-      console.error('Error sending notification for new lead:', err);
-    }
+    (async () => {
+      try {
+        const { sendPushNotification } = await import('./notificationService');
+        sendPushNotification(
+          newLead.assignedToEmail!,
+          'Khách hàng mới được giao 💼',
+          `Bạn vừa được giao khách hàng ${newLead.customerName} bởi ${newLead.creatorEmail}`
+        ).catch(e => console.error('Error sending push notification for new lead:', e));
+
+        const zaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${newLead.customerName}${newLead.phone ? ' - SĐT: ' + newLead.phone : ''}`;
+        sendZaloNotification(newLead.assignedToEmail!, zaloMsg);
+      } catch (err) {
+        console.error('Error in background notification for new lead:', err);
+      }
+    })();
   }
 };
 
@@ -112,18 +115,20 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
 
-  // Notify assigned salesperson of the lead update if updated by someone else
-  if (assignedEmail && assignedEmail !== userEmail) {
-    try {
-      const { sendPushNotification } = await import('./notificationService');
-      await sendPushNotification(
-        assignedEmail,
-        'Cập nhật thông tin khách hàng ✍️',
-        `Khách hàng ${customerName || 'của bạn'} vừa được cập nhật bởi ${userEmail}`
-      );
-    } catch (err) {
-      console.error('Error sending push notification on updateLead:', err);
-    }
+  // Notify assigned salesperson asynchronously in background (non-blocking)
+  if (assignedEmail && assignedEmail.toLowerCase() !== userEmail.toLowerCase()) {
+    (async () => {
+      try {
+        const { sendPushNotification } = await import('./notificationService');
+        sendPushNotification(
+          assignedEmail!,
+          'Cập nhật thông tin khách hàng ✍️',
+          `Khách hàng ${customerName || 'của bạn'} vừa được cập nhật bởi ${userEmail}`
+        ).catch(e => console.error('Error sending push notification on updateLead:', e));
+      } catch (err) {
+        console.error('Error in background notification on updateLead:', err);
+      }
+    })();
   }
 };
 
@@ -172,30 +177,29 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
 
-  // 1. Zalo Notification on Revoke/Reassignment
+  // 1. Zalo Notification on Revoke/Reassignment (background non-blocking)
   if (prevAssignedToEmail && prevAssignedToEmail.toLowerCase() !== (assignedToEmail || '').toLowerCase()) {
-    try {
-      const revokeZaloMsg = `[HKTT CRM] Khách hàng ${customerName}${phone ? ' (' + phone + ')' : ''} đã bị thu hồi khỏi danh sách quản lý của bạn.`;
-      await sendZaloNotification(prevAssignedToEmail, revokeZaloMsg);
-    } catch (err) {
-      console.error('Error sending Zalo revoke notification:', err);
-    }
+    const revokeZaloMsg = `[HKTT CRM] Khách hàng ${customerName}${phone ? ' (' + phone + ')' : ''} đã bị thu hồi khỏi danh sách quản lý của bạn.`;
+    sendZaloNotification(prevAssignedToEmail, revokeZaloMsg);
   }
 
-  // 2. Push & Zalo Notification on Assign
+  // 2. Push & Zalo Notification on Assign (background non-blocking)
   if (assignedToEmail && assignedToEmail.toLowerCase() !== prevAssignedToEmail.toLowerCase()) {
-    try {
-      const { sendPushNotification } = await import('./notificationService');
-      await sendPushNotification(
-        assignedToEmail,
-        'Khách hàng mới được giao 💼',
-        `Bạn vừa được giao khách hàng ${customerName} bởi ${userEmail}`
-      );
-      const assignZaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${customerName}${phone ? ' - SĐT: ' + phone : ''}`;
-      await sendZaloNotification(assignedToEmail, assignZaloMsg);
-    } catch (err) {
-      console.error('Error sending notification on assignLead:', err);
-    }
+    (async () => {
+      try {
+        const { sendPushNotification } = await import('./notificationService');
+        sendPushNotification(
+          assignedToEmail,
+          'Khách hàng mới được giao 💼',
+          `Bạn vừa được giao khách hàng ${customerName} bởi ${userEmail}`
+        ).catch(err => console.error('Error sending push notification on assignLead:', err));
+
+        const assignZaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${customerName}${phone ? ' - SĐT: ' + phone : ''}`;
+        sendZaloNotification(assignedToEmail, assignZaloMsg);
+      } catch (err) {
+        console.error('Error in background notification on assignLead:', err);
+      }
+    })();
   }
 };
 
