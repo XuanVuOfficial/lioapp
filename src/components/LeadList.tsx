@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Edit3, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, CheckCircle2, ChevronRight, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2, Info } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Edit3, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, CheckCircle2, ChevronRight, ChevronDown, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2, Info } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadStats, fetchPaginatedLeads, LeadStatsSummary, subscribeToLeadChanges } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
@@ -78,6 +78,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   // Status Update Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [expandedHistoryIndices, setExpandedHistoryIndices] = useState<Record<number, boolean>>({});
   const [statusForm, setStatusForm] = useState({
     status: '',
     subStatus: '',
@@ -1675,46 +1676,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     </div>
                   );
                 })()}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-2">Thêm ghi chú mới (Timeline)</label>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={newNote}
-                        onChange={e => setNewNote(e.target.value)}
-                        onKeyPress={async (e) => {
-                          if (e.key === 'Enter' && newNote.trim()) {
-                            const timestamp = new Date().toLocaleString('vi-VN');
-                            const username = user.displayName || user.email;
-                            const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
-                            const updatedHistory = [...(selectedLead.history || []), entry];
-                            await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
-                            setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
-                            setNewNote('');
-                          }
-                        }}
-                        placeholder="Nhập nội dung trao đổi..."
-                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                      />
-                      <button 
-                        onClick={async () => {
-                          if (!newNote.trim()) return;
-                          const timestamp = new Date().toLocaleString('vi-VN');
-                          const username = user.displayName || user.email;
-                          const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
-                          const updatedHistory = [...(selectedLead.history || []), entry];
-                          await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
-                          setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
-                          setNewNote('');
-                        }}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-all"
-                      >
-                        Gửi
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </section>
 
               <section>
@@ -1731,13 +1692,100 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     <Info className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+
+                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1 mb-3">
                   {(selectedLead.history || []).slice().reverse().map((entry, i) => {
                     const isNote = entry.startsWith('[NOTE]');
                     const isLog = entry.startsWith('[LOG]');
                     const cleanEntry = entry.replace(/^\[(NOTE|LOG)\]/, '');
                     
                     const parts = cleanEntry.match(/^\[(.*?)\] (.*?): (.*)$/);
+                    const timeStr = parts ? parts[1] : '';
+                    const actorStr = parts ? parts[2] : 'Hệ thống';
+                    const contentStr = parts ? parts[3] : cleanEntry;
+
+                    const isRevoked = entry.toLowerCase().includes('thu hồi') || entry.toLowerCase().includes('quá hạn');
+                    const isAssignee = entry.includes('Người phụ trách:') || entry.includes('Giao khách hàng');
+                    const isExpanded = Boolean(expandedHistoryIndices[i]);
+
+                    // 1. Thẻ Đã thu hồi vì quá hạn (1 dòng duy nhất có badge nhạt + mũi tên)
+                    if (isRevoked) {
+                      return (
+                        <div 
+                          key={i} 
+                          onClick={() => setExpandedHistoryIndices(prev => ({ ...prev, [i]: !prev[i] }))}
+                          className="bg-rose-50/60 hover:bg-rose-100/60 border border-rose-200/60 rounded-xl p-2.5 transition-all cursor-pointer select-none text-xs text-rose-900 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="px-1.5 py-0.5 rounded-md bg-rose-200/80 text-rose-800 text-[10px] font-bold shrink-0 uppercase tracking-wider">
+                                Thu hồi
+                              </span>
+                              <span className="font-semibold text-rose-800 truncate">
+                                {contentStr.includes('thu hồi') ? contentStr : `Đã thu hồi vì quá hạn`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 text-rose-500">
+                              {timeStr && <span className="text-[10px] opacity-75 font-mono hidden sm:inline">{timeStr}</span>}
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="mt-2 pt-2 border-t border-rose-200/50 text-xs text-rose-800 space-y-1">
+                              <div className="flex justify-between items-center text-[11px] text-rose-700 font-medium">
+                                <span>Thực hiện: <strong>{actorStr}</strong></span>
+                                <span>Thời gian: {timeStr}</span>
+                              </div>
+                              <p className="italic text-slate-700 bg-white/80 p-2 rounded-lg border border-rose-100/80">
+                                {contentStr}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // 2. Thẻ Người phụ trách (1 dòng duy nhất có badge nhạt + mũi tên)
+                    if (isAssignee) {
+                      const displayAssignee = contentStr.startsWith('Người phụ trách:') ? contentStr : `Người phụ trách: ${contentStr}`;
+                      return (
+                        <div 
+                          key={i} 
+                          onClick={() => setExpandedHistoryIndices(prev => ({ ...prev, [i]: !prev[i] }))}
+                          className="bg-blue-50/50 hover:bg-blue-100/50 border border-blue-200/60 rounded-xl p-2.5 transition-all cursor-pointer select-none text-xs text-blue-900 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="px-1.5 py-0.5 rounded-md bg-blue-200/80 text-blue-800 text-[10px] font-bold shrink-0 uppercase tracking-wider">
+                                Phụ trách
+                              </span>
+                              <span className="font-semibold text-blue-900 truncate">
+                                {displayAssignee}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 text-blue-500">
+                              {timeStr && <span className="text-[10px] opacity-75 font-mono hidden sm:inline">{timeStr}</span>}
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="mt-2 pt-2 border-t border-blue-200/50 text-xs text-blue-900 space-y-1">
+                              <div className="flex justify-between items-center text-[11px] text-blue-700 font-medium">
+                                <span>Người giao: <strong>{actorStr}</strong></span>
+                                <span>Thời gian: {timeStr}</span>
+                              </div>
+                              <p className="italic text-slate-700 bg-white/80 p-2 rounded-lg border border-blue-100/80">
+                                {displayAssignee}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // 3. Các thẻ khác (Ghi chú / Cập nhật trạng thái thông thường)
                     if (parts) {
                       return (
                         <div key={i} className={`p-3 rounded-xl border ${isNote ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
@@ -1754,7 +1802,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             </div>
                             <span className="text-[10px] text-slate-400">{parts[1]}</span>
                           </div>
-                          <p className="text-sm text-slate-700 leading-relaxed italic">{isNote ? parts[3] : parts[3]}</p>
+                          <p className="text-sm text-slate-700 leading-relaxed italic">{parts[3]}</p>
                         </div>
                       );
                     }
@@ -1765,6 +1813,42 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                       </div>
                     );
                   })}
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                  <input 
+                    type="text" 
+                    value={newNote}
+                    onChange={e => setNewNote(e.target.value)}
+                    onKeyPress={async (e) => {
+                      if (e.key === 'Enter' && newNote.trim()) {
+                        const timestamp = new Date().toLocaleString('vi-VN');
+                        const username = user.displayName || user.email;
+                        const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
+                        const updatedHistory = [...(selectedLead.history || []), entry];
+                        await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
+                        setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
+                        setNewNote('');
+                      }
+                    }}
+                    placeholder="Nhập nội dung trao đổi..."
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm shadow-2xs"
+                  />
+                  <button 
+                    onClick={async () => {
+                      if (!newNote.trim()) return;
+                      const timestamp = new Date().toLocaleString('vi-VN');
+                      const username = user.displayName || user.email;
+                      const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
+                      const updatedHistory = [...(selectedLead.history || []), entry];
+                      await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
+                      setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
+                      setNewNote('');
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all cursor-pointer shadow-sm shadow-emerald-200"
+                  >
+                    Gửi
+                  </button>
                 </div>
               </section>
 
