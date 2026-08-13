@@ -291,7 +291,54 @@ async function startServer() {
     });
   });
 
-  // 3. Send Push Notification via Node FCM Admin
+  // Helper to send Zalo Webhook notification via N8N API
+  async function sendZaloWebhookNotification(recipientEmails: string[], title: string, body: string) {
+    const ZALO_GROUP_ID = '1983318870321097523';
+    const fullMessage = `${title}\n${body}`.trim();
+
+    try {
+      let query = 'SELECT email, useridzalo FROM users WHERE useridzalo IS NOT NULL AND useridzalo != ""';
+      let params: any[] = [];
+
+      if (recipientEmails.length > 0 && !recipientEmails.includes('all')) {
+        query += ' AND LOWER(email) IN (' + recipientEmails.map(() => '?').join(',') + ')';
+        params = recipientEmails.map(e => e.toLowerCase());
+      }
+
+      const [rows] = await dbPool.query<mysql.RowDataPacket[]>(query, params);
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        const uniqueZaloUsers = new Set<string>();
+        for (const row of rows) {
+          if (row.useridzalo && String(row.useridzalo).trim()) {
+            uniqueZaloUsers.add(String(row.useridzalo).trim());
+          }
+        }
+
+        for (const useridzalo of uniqueZaloUsers) {
+          const webhookUrl = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(ZALO_GROUP_ID)}&userid=${encodeURIComponent(useridzalo)}&message=${encodeURIComponent(fullMessage)}`;
+          
+          if (typeof fetch !== 'undefined') {
+            fetch(webhookUrl)
+              .then(res => console.log(`[Zalo Webhook] Triggered for useridzalo ${useridzalo}: status ${res.status}`))
+              .catch(err => console.error(`[Zalo Webhook] Error for ${useridzalo}:`, err.message));
+          } else {
+            import('https').then(https => {
+              https.get(webhookUrl, (res) => {
+                console.log(`[Zalo Webhook HTTPS] Triggered for ${useridzalo}: status ${res.statusCode}`);
+              }).on('error', (e) => {
+                console.error(`[Zalo Webhook HTTPS] Error for ${useridzalo}:`, e.message);
+              });
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('[Zalo Webhook] Error querying user Zalo IDs:', error.message);
+    }
+  }
+
+  // 3. Send Push Notification via Node FCM Admin & Zalo Webhook
   app.post('/api/notifications/send', async (req, res) => {
     try {
       const input = req.body || {};
@@ -321,6 +368,11 @@ async function startServer() {
           message: 'Thiếu tiêu đề (title) hoặc nội dung (body) thông báo.',
         });
       }
+
+      // Simultaneously trigger Zalo notification via N8N Webhook API
+      sendZaloWebhookNotification(recipientEmails, title, body).catch(err => {
+        console.error('[Zalo Webhook Async Error]:', err);
+      });
 
       let allTokens = await loadFcmTokens();
       let targetTokens = isSendToAll
