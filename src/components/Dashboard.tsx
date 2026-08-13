@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Users, UserPlus, TrendingUp, CheckCircle, Clock, AlertCircle, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react';
 import { Lead, Department, UserProfile } from '../types';
-import { LeadStatsSummary } from '../services/leadService';
+import { fetchDashboardData, DashboardData } from '../services/leadService';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line 
@@ -12,12 +12,31 @@ interface Props {
   leads: Lead[];
   departments: Department[];
   user: UserProfile;
-  statsSummary?: LeadStatsSummary | null;
 }
 
 const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-export const Dashboard: React.FC<Props> = ({ leads, departments, user, statsSummary }) => {
+export const Dashboard: React.FC<Props> = ({ leads: initialLeads, departments, user }) => {
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchDashboardData({
+      role: user.role,
+      userEmail: user.email,
+      departmentIds: user.managedDeptIds
+    }).then(res => {
+      if (isMounted) {
+        setDashboardData(res);
+      }
+    }).catch(e => console.error('fetchDashboardData error', e));
+
+    return () => { isMounted = false; };
+  }, [user.role, user.email, user.managedDeptIds]);
+
+  const statsSummary = dashboardData?.statsSummary;
+  const recentLeads = dashboardData?.recentLeads || initialLeads.slice(0, 5);
+
   const stats = useMemo(() => {
     if (statsSummary) {
       return [
@@ -28,18 +47,12 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user, statsSumm
       ];
     }
     return [
-      { label: 'Tổng số khách hàng', value: leads.length, icon: UserPlus, color: 'bg-blue-50 text-blue-600' },
-      { label: 'Đã liên hệ', value: leads.filter(l => l.status === 'Đã liên hệ').length, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
-      { label: 'Đã booking/cọc', value: leads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length, icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
-      { label: 'Chưa liên hệ', value: leads.filter(l => l.status === 'Chưa liên hệ').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
+      { label: 'Tổng số khách hàng', value: initialLeads.length, icon: UserPlus, color: 'bg-blue-50 text-blue-600' },
+      { label: 'Đã liên hệ', value: initialLeads.filter(l => l.status === 'Đã liên hệ').length, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
+      { label: 'Đã booking/cọc', value: initialLeads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length, icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
+      { label: 'Chưa liên hệ', value: initialLeads.filter(l => l.status === 'Chưa liên hệ').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
     ];
-  }, [leads, statsSummary]);
-
-  const recentLeads = useMemo(() => {
-    return [...leads]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, 5);
-  }, [leads]);
+  }, [initialLeads, statsSummary]);
 
   // Data for Bar Chart: Leads by Status
   const leadsByStatusData = useMemo(() => {

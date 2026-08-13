@@ -461,6 +461,24 @@ export const getLeadById = async (id: string): Promise<Lead | null> => {
   return null;
 };
 
+export interface DashboardData {
+  statsSummary: LeadStatsSummary;
+  recentLeads: Lead[];
+}
+
+export const fetchDashboardData = async (
+  options: Omit<LeadFilterOptions, 'status'>
+): Promise<DashboardData> => {
+  const [statsSummary, recentLeads] = await Promise.all([
+    fetchLeadStats(options),
+    fetchRecentLeads(5, options.role, options.userEmail, options.departmentIds)
+  ]);
+  return {
+    statsSummary,
+    recentLeads
+  };
+};
+
 export const fetchRecentLeads = async (
   limit: number = 5,
   role?: UserRole,
