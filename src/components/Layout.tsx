@@ -146,9 +146,9 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col md:flex-row">
       {/* Mobile Top Header */}
-      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+      <header className="md:hidden shrink-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between z-40">
         <div className="flex items-center gap-2">
           <img src="https://thienlong.pro.vn/icon.jpg" alt="HKTT Icon" className="w-8 h-8 rounded-lg object-cover" />
           <h1 className="text-lg font-bold text-slate-900">HKTT</h1>
@@ -161,19 +161,19 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
         </button>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Desktop Sidebar / Mobile Overlay Sidebar */}
         <aside className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 p-4 flex flex-col transition-transform duration-300 ease-in-out
-          md:relative md:translate-x-0
+          fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 p-4 flex flex-col transition-transform duration-300 ease-in-out shrink-0
+          md:relative md:translate-x-0 md:h-full md:z-30
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
-          <div className="hidden md:flex items-center gap-2 mb-8 px-2">
+          <div className="hidden md:flex items-center gap-2 mb-8 px-2 shrink-0">
             <img src="https://thienlong.pro.vn/icon.jpg" alt="HKTT Icon" className="w-8 h-8 rounded-lg object-cover" />
             <h1 className="text-xl font-bold text-slate-900">HKTT</h1>
           </div>
 
-          <nav className="flex-1 space-y-1">
+          <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
             {filteredNavItems.map(item => (
               <button
                 key={item.id}
@@ -191,7 +191,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
             ))}
           </nav>
 
-          <div className="mt-auto pt-4 border-t border-slate-100">
+          <div className="mt-auto pt-4 border-t border-slate-100 shrink-0">
             <div className="flex items-center gap-3 px-3 py-2 mb-2">
               <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center shrink-0 border border-slate-200 overflow-hidden">
                 {user?.avatarUrl ? (
@@ -246,7 +246,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-2.5 md:p-6 pb-20 md:pb-6">
+        <main className="flex-1 h-full overflow-y-auto p-2.5 md:p-6 pb-20 md:pb-6">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
