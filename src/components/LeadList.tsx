@@ -871,10 +871,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               Đang tải thêm khách hàng...
             </div>
             <button
-              onClick={loadMore}
+              onClick={handleLoadNextPage}
               className="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-all shadow-sm border border-slate-200"
             >
-              Tải thêm ngay ({filteredLeads.length - visibleCount} khách hàng còn lại)
+              Tải thêm 20 khách hàng tiếp theo
             </button>
           </div>
         )}
