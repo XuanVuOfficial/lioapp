@@ -130,23 +130,49 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
         <p className="text-slate-500 mt-1 text-xs md:text-sm">Đây là những gì đang diễn ra trong quy trình bán hàng của bạn hôm nay.</p>
       </header>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="bg-white p-3.5 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center mb-2.5 md:mb-3 ${stat.color}`}>
-              <stat.icon className="w-4 h-4 md:w-5 md:h-5" />
+      {!dashboardData ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={`d-skel-${i}`} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-pulse flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-200 rounded-xl"></div>
+                <div className="space-y-2 flex-1">
+                  <div className="h-3 bg-slate-200 rounded w-3/4"></div>
+                  <div className="h-6 bg-slate-200 rounded w-1/2"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse h-[360px]">
+              <div className="h-6 bg-slate-200 rounded w-1/3 mb-6"></div>
+              <div className="h-[260px] bg-slate-100 rounded-xl"></div>
             </div>
-            <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
-            <p className="text-lg md:text-2xl font-bold text-slate-900 mt-0.5">{stat.value}</p>
-          </motion.div>
-        ))}
-      </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse h-[360px]">
+              <div className="h-6 bg-slate-200 rounded w-1/3 mb-6"></div>
+              <div className="h-[260px] bg-slate-100 rounded-xl"></div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {stats.map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="bg-white p-3.5 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center mb-2.5 md:mb-3 ${stat.color}`}>
+                  <stat.icon className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
+                <p className="text-lg md:text-2xl font-bold text-slate-900 mt-0.5">{stat.value}</p>
+              </motion.div>
+            ))}
+          </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
@@ -267,6 +293,6 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

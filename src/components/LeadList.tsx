@@ -34,6 +34,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   };
 
   const [showAssignModal, setShowAssignModal] = useState<Lead | null>(null);
+  const [assignSearchTerm, setAssignSearchTerm] = useState('');
   const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('Tất cả');
@@ -895,8 +896,28 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
           </div>
 
           <div className="space-y-3">
+        {isLoadingLeads ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={`skel-lead-${i}`} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-pulse flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3 w-full md:w-1/4">
+                  <div className="w-10 h-10 bg-slate-200 rounded-xl shrink-0"></div>
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-slate-150 rounded w-1/2"></div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-1/3">
+                  <div className="h-6 bg-slate-200 rounded-full w-24"></div>
+                  <div className="h-6 bg-slate-150 rounded-full w-20"></div>
+                </div>
+                <div className="h-4 bg-slate-200 rounded w-28"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <AnimatePresence mode="popLayout">
-          {displayedLeads.length === 0 && !isLoadingLeads ? (
+          {displayedLeads.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 md:py-20 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
               <User className="w-10 h-10 md:w-12 md:h-12 mb-4 opacity-20" />
               <p className="text-sm px-4 text-center">Không tìm thấy khách hàng nào. Hãy tạo mới để bắt đầu.</p>
@@ -1171,111 +1192,126 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         </div>
       )}
 
-      {/* Assign Modal */}
+      {/* Searchable Assign Lead Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-6">Giao khách hàng: {showAssignModal.customerName}</h3>
-            
-            <div className="space-y-6">
-              {/* Assign to Sub-Departments */}
-              {subDepts.length > 0 && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl max-w-md w-full p-4 md:p-5 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]"
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4" />
+                </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Giao cho phòng ban con</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {subDepts.map(d => {
-                      const isSelected = showAssignModal.departmentId === d.id;
+                  <h3 className="font-bold text-slate-900 text-base">Giao khách hàng</h3>
+                  <p className="text-xs text-slate-500 font-semibold">{showAssignModal.customerName}</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowAssignModal(null); setAssignSearchTerm(''); }} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input 
+                type="text"
+                autoFocus
+                placeholder="Gõ tên/email nhân viên hoặc phòng ban..."
+                value={assignSearchTerm}
+                onChange={e => setAssignSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Content List */}
+            <div className="overflow-y-auto space-y-2 flex-1 pr-1">
+              {/* Option to assign to self */}
+              {user.role === 'tp' && (!assignSearchTerm || 'bản thân me'.includes(assignSearchTerm.toLowerCase()) || user.displayName.toLowerCase().includes(assignSearchTerm.toLowerCase())) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAssign(showAssignModal, user.email, user.departmentId);
+                    setAssignSearchTerm('');
+                  }}
+                  className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
+                    showAssignModal.assignedToEmail === user.email ? 'border-blue-500 bg-blue-50 text-blue-900 font-bold' : 'border-slate-100 hover:border-blue-200 hover:bg-blue-50 text-slate-700'
+                  }`}
+                >
+                  <div>
+                    <p className="font-semibold text-sm text-blue-900">Giao cho bản thân (Trưởng phòng)</p>
+                    <p className="text-xs text-blue-600">{user.displayName} ({user.email})</p>
+                  </div>
+                  {showAssignModal.assignedToEmail === user.email && <Check className="w-4 h-4 text-blue-600" />}
+                </button>
+              )}
+
+              {/* Sub-departments */}
+              {subDepts.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Phòng ban con</p>
+                  {subDepts
+                    .filter(d => d.name.toLowerCase().includes(assignSearchTerm.toLowerCase()))
+                    .map(d => {
+                      const isSel = showAssignModal.departmentId === d.id;
                       return (
                         <button
                           key={d.id}
-                          onClick={() => handleAssign(showAssignModal, undefined, d.id)}
-                          className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
-                            isSelected 
-                              ? 'border-emerald-500 bg-emerald-50' 
-                              : 'border-slate-100 hover:border-emerald-200 hover:bg-emerald-50'
+                          type="button"
+                          onClick={() => {
+                            handleAssign(showAssignModal, undefined, d.id);
+                            setAssignSearchTerm('');
+                          }}
+                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
+                            isSel ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50 text-slate-700'
                           }`}
                         >
                           <div>
-                            <p className="font-semibold text-slate-900">{d.name}</p>
-                            <p className="text-xs text-slate-500">Trưởng phòng: {d.managerName}</p>
+                            <p className="font-semibold text-sm">{d.name}</p>
+                            <p className="text-xs text-slate-500">Trưởng phòng: {d.managerName || 'Chưa phân công'}</p>
                           </div>
-                          {isSelected ? (
-                            <Check className="w-4 h-4 text-emerald-600" />
-                          ) : (
-                            <Plus className="w-4 h-4 text-emerald-600" />
-                          )}
+                          {isSel && <Check className="w-4 h-4 text-emerald-600" />}
                         </button>
                       );
                     })}
-                  </div>
                 </div>
               )}
 
-              {/* Assign to Staff */}
-              <div>
-                <label className="block text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Giao cho nhân viên</label>
-                <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
-                  {/* Option to assign to self if manager */}
-                  {user.role === 'tp' && (
-                    <button
-                      onClick={() => handleAssign(showAssignModal, user.email, user.departmentId)}
-                      className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
-                        showAssignModal.assignedToEmail === user.email 
-                          ? 'border-blue-500 bg-blue-50' 
-                          : 'border-blue-100 hover:border-blue-200 hover:bg-blue-50'
-                      }`}
-                    >
-                      <div>
-                        <p className="font-semibold text-blue-900">Giao cho bản thân (Trưởng phòng)</p>
-                        <p className="text-xs text-blue-500">{user.displayName} ({user.email})</p>
-                      </div>
-                      {showAssignModal.assignedToEmail === user.email ? (
-                        <Check className="w-4 h-4 text-blue-600" />
-                      ) : (
-                        <User className="w-4 h-4 text-blue-600" />
-                      )}
-                    </button>
-                  )}
-
-                  {staff.length === 0 ? (
-                    <p className="text-sm text-slate-500 italic mt-2">Không tìm thấy nhân viên nào khác trong phòng ban này.</p>
-                  ) : (
-                    staff.filter(s => s.email !== user.email).map(s => {
-                      const isSelected = showAssignModal.assignedToEmail === s.email;
-                      return (
-                        <button
-                          key={s.uid}
-                          onClick={() => handleAssign(showAssignModal, s.email, undefined)}
-                          className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
-                            isSelected 
-                              ? 'border-emerald-500 bg-emerald-50' 
-                              : 'border-slate-100 hover:border-emerald-200 hover:bg-emerald-50'
-                          }`}
-                        >
-                          <div>
-                            <p className="font-semibold text-slate-900">{s.displayName}</p>
-                            <p className="text-xs text-slate-500">{s.email}</p>
-                          </div>
-                          {isSelected ? (
-                            <Check className="w-4 h-4 text-emerald-600" />
-                          ) : (
-                            <UserPlus className="w-4 h-4 text-emerald-600" />
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
+              {/* Staff List */}
+              <div className="space-y-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Nhân viên phụ trách</p>
+                {staff
+                  .filter(s => s.email !== user.email && (s.displayName.toLowerCase().includes(assignSearchTerm.toLowerCase()) || s.email.toLowerCase().includes(assignSearchTerm.toLowerCase())))
+                  .map(s => {
+                    const isSel = showAssignModal.assignedToEmail === s.email;
+                    return (
+                      <button
+                        key={s.uid}
+                        type="button"
+                        onClick={() => {
+                          handleAssign(showAssignModal, s.email, undefined);
+                          setAssignSearchTerm('');
+                        }}
+                        className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
+                          isSel ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-semibold text-sm">{s.displayName}</p>
+                          <p className="text-xs text-slate-500">{s.email} • {getRoleName(s.role)}</p>
+                        </div>
+                        {isSel && <Check className="w-4 h-4 text-emerald-600" />}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
-
-            <button 
-              onClick={() => setShowAssignModal(null)}
-              className="w-full mt-6 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition-all"
-            >
-              Hủy
-            </button>
-          </div>
+          </motion.div>
         </div>
       )}
 
