@@ -231,32 +231,49 @@ const DEFAULT_ZALO_GROUP_ID = '1983318870321097523';
 async function sendZaloWebhookNotification(emailOrUserId: string, message: string) {
   if (!emailOrUserId || !message) return;
   try {
-    let zaloUserId = emailOrUserId.trim();
+    let zaloUserId = '';
+    let userName = '';
+
     if (emailOrUserId.includes('@')) {
       const [rows] = await dbPool.query<mysql.RowDataPacket[]>(
-        'SELECT useridzalo FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+        'SELECT useridzalo, name FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
         [emailOrUserId.trim()]
       );
-      if (Array.isArray(rows) && rows.length > 0 && rows[0].useridzalo) {
-        zaloUserId = String(rows[0].useridzalo).trim();
-      } else {
-        console.log(`[Zalo Webhook] No useridzalo found in MySQL for email: ${emailOrUserId}`);
-        return;
+      if (Array.isArray(rows) && rows.length > 0) {
+        if (rows[0].useridzalo) {
+          zaloUserId = String(rows[0].useridzalo).trim();
+        }
+        if (rows[0].name) {
+          userName = String(rows[0].name).trim();
+        }
       }
+    } else {
+      // Direct Zalo User ID passed
+      zaloUserId = emailOrUserId.trim();
     }
 
-    if (!zaloUserId) return;
+    let finalMessage = message;
+    let url: string;
 
-    const url = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(DEFAULT_ZALO_GROUP_ID)}&userid=${encodeURIComponent(zaloUserId)}&message=${encodeURIComponent(message)}`;
-    console.log(`[Zalo Webhook] Triggering webhook for Zalo User ID: ${zaloUserId}...`);
+    if (zaloUserId) {
+      url = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(DEFAULT_ZALO_GROUP_ID)}&userid=${encodeURIComponent(zaloUserId)}&message=${encodeURIComponent(finalMessage)}`;
+      console.log(`[Zalo Webhook] Triggering webhook for Zalo User ID: ${zaloUserId}...`);
+    } else {
+      // No useridzalo: prepend #name to message, send without userid param
+      const tag = userName || emailOrUserId;
+      finalMessage = `#${tag} ${message}`;
+      url = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(DEFAULT_ZALO_GROUP_ID)}&message=${encodeURIComponent(finalMessage)}`;
+      console.log(`[Zalo Webhook] No useridzalo, sending group message with tag #${tag}...`);
+    }
+
     const res = await fetch(url);
     if (res.ok) {
-      console.log(`[Zalo Webhook] Successfully sent notification to Zalo User ID ${zaloUserId}`);
+      console.log(`[Zalo Webhook] Successfully sent notification${zaloUserId ? ' to ' + zaloUserId : ' (group tag)'}`);
     } else {
-      console.warn(`[Zalo Webhook] Failed to send notification to ${zaloUserId}, status: ${res.status}`);
+      console.warn(`[Zalo Webhook] Failed, status: ${res.status}`);
     }
   } catch (err: any) {
-    console.error(`[Zalo Webhook] Error sending webhook to Zalo User ID (${emailOrUserId}):`, err?.message || err);
+    console.error(`[Zalo Webhook] Error sending webhook (${emailOrUserId}):`, err?.message || err);
   }
 }
 
