@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save, Copy } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save, Copy, Eye, EyeOff } from 'lucide-react';
 import { UserProfile, Department } from '../types';
 import { AppSettings } from '../services/settingsService';
 import { updateUserProfile } from '../services/userService';
@@ -23,6 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
   const [editingProfile, setEditingProfile] = React.useState<{ password?: string; avatarUrl?: string }>({});
   const [isSaving, setIsSaving] = React.useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
@@ -335,27 +336,37 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
                     <div className="relative group/copy">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                       <input
-                        type="text"
+                        type={showPassword ? "text" : "password"}
                         value={editingProfile.password || ''}
                         onChange={(e) => setEditingProfile({ ...editingProfile, password: e.target.value })}
-                        className="w-full pl-10 pr-12 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-mono"
+                        className="w-full pl-10 pr-20 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-mono"
                         placeholder="Mật khẩu của bạn"
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (editingProfile.password) {
-                            navigator.clipboard.writeText(editingProfile.password);
-                            alert('Đã sao chép mật khẩu!');
-                          }
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                        title="Sao chép mật khẩu"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(prev => !prev)}
+                          className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-md hover:bg-slate-100"
+                          title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingProfile.password) {
+                              navigator.clipboard.writeText(editingProfile.password);
+                              alert('Đã sao chép mật khẩu!');
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors rounded-md hover:bg-slate-100"
+                          title="Sao chép mật khẩu"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">Sẽ tự động yêu cầu đổi mật khẩu khi đăng nhập lại nếu bạn là người quản lý cấp tài khoản.</p>
+                    <p className="text-xs text-slate-500 mt-1">Mật khẩu mặc định che giấu sao. Bấm biểu tượng con mắt để xem.</p>
                   </div>
                 </form>
               </div>

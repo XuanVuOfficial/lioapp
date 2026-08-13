@@ -321,7 +321,9 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         departmentId: editingUser.departmentId || undefined,
         updatedAt: Date.now(),
         avatarUrl: editingUser.avatarUrl || undefined,
-        hireDate: editingUser.hireDate || undefined
+        hireDate: editingUser.hireDate || undefined,
+        phone: editingUser.phone ? editingUser.phone.trim() : undefined,
+        useridzalo: editingUser.useridzalo || undefined
       };
       if (editingUser.password) {
         updates.password = editingUser.password;
@@ -1087,16 +1089,40 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 >
                   Hủy
                 </button>
-                <button 
-                  onClick={handleCheckZaloEdit}
-                  disabled={isCheckingZalo}
-                  className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-lg shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isCheckingZalo ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : null}
-                  Kiểm tra
-                </button>
+                {(() => {
+                  const originalUser = users.find(u => u.uid === editingUser.uid);
+                  const isPhoneUnchanged = editingUser.phone?.trim() === originalUser?.phone?.trim();
+                  const hasExistingZaloId = !!editingUser.useridzalo;
+                  const canSaveDirectly = hasExistingZaloId && isPhoneUnchanged;
+
+                  if (canSaveDirectly) {
+                    return (
+                      <button 
+                        onClick={handleUpdate}
+                        disabled={isLoading}
+                        className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isLoading ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : null}
+                        Lưu thay đổi
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <button 
+                      onClick={handleCheckZaloEdit}
+                      disabled={isCheckingZalo}
+                      className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-lg shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isCheckingZalo ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : null}
+                      Kiểm tra
+                    </button>
+                  );
+                })()}
               </div>
             </motion.div>
           </div>
