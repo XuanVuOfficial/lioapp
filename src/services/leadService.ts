@@ -187,6 +187,20 @@ export const deleteLead = async (lead: Lead): Promise<void> => {
   await executeMutation('leads', 'DELETE', lead, `DELETE FROM leads WHERE id = ${escapeSQL(lead.id)} LIMIT 1`);
 };
 
+export const ESSENTIAL_LEAD_COLUMNS = 'id, creatorEmail, createdAt, assignedToEmail, assignedByEmail, assignedAt, isUpdatedByAssignee, departmentId, projectId, customerCode, customerName, phone, email, status, subStatus, appointmentStatus, resultStatus, interestLevel, updatedAt, updatedByEmail';
+
+export const getLeadById = async (id: string): Promise<Lead | null> => {
+  try {
+    const data = await queryDB(`SELECT * FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+    if (data && Array.isArray(data) && data.length > 0) {
+      return parseLead(data[0]);
+    }
+  } catch (e) {
+    console.error('getLeadById error:', e);
+  }
+  return null;
+};
+
 export const subscribeToLeads = (
   role: UserRole,
   email: string,
@@ -208,7 +222,7 @@ export const subscribeToLeads = (
     if (isFetching) return;
     isFetching = true;
     try {
-      const sql = `SELECT * FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT 1000`;
+      const sql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT 1000`;
       const data = await queryDB(sql);
       if (isMounted && Array.isArray(data)) {
         let leads = data.map(parseLead);

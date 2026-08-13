@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
-import { createLead, updateLead, assignLead, deleteLead } from '../services/leadService';
+import { createLead, updateLead, assignLead, deleteLead, getLeadById } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
 import { exportLeadsToExcel } from '../utils/excelExport';
 
@@ -20,6 +20,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
+  const handleSelectLead = async (lead: Lead) => {
+    setSelectedLead(lead);
+    try {
+      const fullLead = await getLeadById(lead.id);
+      if (fullLead) {
+        setSelectedLead(fullLead);
+      }
+    } catch (e) {
+      console.error('Error fetching full lead details', e);
+    }
+  };
+
   const [showAssignModal, setShowAssignModal] = useState<Lead | null>(null);
   const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
@@ -678,7 +691,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 key={lead.id}
-                onClick={() => setSelectedLead(lead)}
+                onClick={() => handleSelectLead(lead)}
                 className={`rounded-2xl shadow-sm hover:shadow-md transition-all group cursor-pointer p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                   !lead.assignedToEmail 
                     ? 'bg-amber-50/90 border-2 border-amber-300 shadow-amber-100/50' 
