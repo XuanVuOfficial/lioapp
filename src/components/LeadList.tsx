@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Edit3, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, CheckCircle2, ChevronRight, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2 } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadStats, fetchPaginatedLeads, LeadStatsSummary, subscribeToLeadChanges } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
@@ -74,6 +74,86 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     type: 'project' | 'department' | 'staff' | null;
     searchTerm: string;
   }>({ type: null, searchTerm: '' });
+
+  // Status Update Modal State
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusForm, setStatusForm] = useState({
+    status: 'Chưa liên hệ',
+    subStatus: '',
+    appointmentStatus: '',
+    resultStatus: '',
+    note: ''
+  });
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
+
+  const handleOpenStatusModal = () => {
+    if (!selectedLead) return;
+    setStatusForm({
+      status: selectedLead.status || 'Chưa liên hệ',
+      subStatus: selectedLead.subStatus || '',
+      appointmentStatus: selectedLead.appointmentStatus || '',
+      resultStatus: selectedLead.resultStatus || '',
+      note: ''
+    });
+    setShowStatusModal(true);
+  };
+
+  const isStatusFormValid = () => {
+    if (!statusForm.status) return false;
+    if (statusForm.status === 'Chưa liên hệ') {
+      return true;
+    }
+    if (statusForm.status === 'Không liên hệ được') {
+      return Boolean(statusForm.subStatus);
+    }
+    if (statusForm.status === 'Đã liên hệ') {
+      if (!statusForm.subStatus) return false;
+      if (statusForm.subStatus === 'Rác / Không quan tâm') return true;
+      if (statusForm.subStatus === 'Đang tư vấn') {
+        return Boolean(statusForm.appointmentStatus && statusForm.resultStatus);
+      }
+    }
+    return false;
+  };
+
+  const handleSaveStatusModal = async () => {
+    if (!selectedLead || !isStatusFormValid() || isSavingStatus) return;
+    setIsSavingStatus(true);
+    try {
+      const parts: string[] = [];
+      if (statusForm.status) parts.push(statusForm.status);
+      if (statusForm.subStatus) parts.push(statusForm.subStatus);
+      if (statusForm.appointmentStatus) parts.push(statusForm.appointmentStatus);
+      if (statusForm.resultStatus) parts.push(statusForm.resultStatus);
+      const statusChain = parts.join(' > ');
+
+      const timestamp = new Date().toLocaleString('vi-VN');
+      const username = user.displayName || user.email;
+      const noteText = statusForm.note.trim() ? ` (note: ${statusForm.note.trim()})` : '';
+      const entry = `[LOG][${timestamp}] ${username}: cập nhật trạng thái "${statusChain}"${noteText}`;
+
+      const updates: Partial<Lead> = {
+        status: statusForm.status,
+        subStatus: statusForm.subStatus || '',
+        appointmentStatus: statusForm.appointmentStatus || '',
+        resultStatus: statusForm.resultStatus || ''
+      };
+
+      const updatedHistory = [...(selectedLead.history || []), entry];
+      await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
+      setSelectedLead({
+        ...selectedLead,
+        ...updates,
+        history: updatedHistory,
+        isUpdatedByAssignee: true
+      });
+      setShowStatusModal(false);
+    } catch (err: any) {
+      alert('Lỗi khi cập nhật trạng thái: ' + (err.message || err));
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
 
   const [, setTick] = useState(0);
 
@@ -1484,137 +1564,68 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 })()}
 
                 <section>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Cập nhật thông tin</h4>
-                  {(()=>{
-                    const isRoleAllowedToEditStatus = ['tgd', 'admin', 'gds'].includes(user.role);
-                    const isStatusDisabled = false;
-                    const isSubStatusDisabled = false;
-                    const isAppointmentStatusDisabled = false;
-                    const isResultStatusDisabled = false;
-                    
-                    return (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-xs text-slate-500 mb-1">Trạng thái</label>
-                            <select 
-                              value={selectedLead.status}
-                              disabled={isStatusDisabled}
-                              onChange={async (e) => {
-                                const status = e.target.value;
-                                const updates: Partial<Lead> = { 
-                                  status, 
-                                  subStatus: '', 
-                                  appointmentStatus: '', 
-                                  resultStatus: '' 
-                                };
-                                const timestamp = new Date().toLocaleString('vi-VN');
-                                const username = user.displayName || user.email;
-                                const entry = `[LOG][${timestamp}] ${username}: cập nhật Trạng thái là '${status}'`;
-                                const updatedHistory = [...(selectedLead.history || []), entry];
-                                await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
-                                setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
-                              }}
-                              className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
-                                isStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500'
-                              }`}
-                            >
-                              {statuses.filter(s => s !== 'Tất cả').map(s => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
-                          </div>
-                          {selectedLead.status && subStatuses[selectedLead.status as keyof typeof subStatuses] && (
-                            <div>
-                              <label className="block text-xs text-slate-500 mb-1">Chi tiết trạng thái</label>
-                              <select 
-                                value={selectedLead.subStatus || ''}
-                                disabled={isSubStatusDisabled}
-                                onChange={async (e) => {
-                                  const subStatus = e.target.value;
-                                  const updates: Partial<Lead> = { 
-                                    subStatus,
-                                    appointmentStatus: '',
-                                    resultStatus: ''
-                                  };
-                                  const timestamp = new Date().toLocaleString('vi-VN');
-                                  const username = user.displayName || user.email;
-                                  const actionText = subStatus ? `cập nhật Trạng thái là '${selectedLead.status} > ${subStatus}'` : `đã xóa Trạng thái chi tiết (trước đó là '${selectedLead.subStatus}')`;
-                                  const entry = `[LOG][${timestamp}] ${username}: ${actionText}`;
-                                  const updatedHistory = [...(selectedLead.history || []), entry];
-                                  await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
-                                  setSelectedLead({ ...selectedLead, ...updates, history: updatedHistory });
-                                }}
-                                className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
-                                  isSubStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500 bg-white'
-                                }`}
-                              >
-                                <option value="">Chọn chi tiết</option>
-                                {subStatuses[selectedLead.status as keyof typeof subStatuses].map(s => (
-                                  <option key={s} value={s}>{s}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Cập nhật thông tin</h4>
+                  </div>
+                  {(() => {
+                    const currentChainParts: string[] = [];
+                    if (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
+                      currentChainParts.push(selectedLead.status);
+                      if (selectedLead.subStatus) currentChainParts.push(selectedLead.subStatus);
+                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
+                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
+                    } else if (selectedLead.subStatus) {
+                      currentChainParts.push(selectedLead.status || 'Chưa liên hệ');
+                      currentChainParts.push(selectedLead.subStatus);
+                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
+                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
+                    }
 
-                        {selectedLead.subStatus === 'Đang tư vấn' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                              <label className="block text-xs text-slate-500 mb-1">Hẹn khách</label>
-                              <select 
-                                value={selectedLead.appointmentStatus || ''}
-                                disabled={isAppointmentStatusDisabled}
-                                onChange={async (e) => {
-                                  const appointmentStatus = e.target.value;
-                                  const timestamp = new Date().toLocaleString('vi-VN');
-                                  const username = user.displayName || user.email;
-                                  const actionText = appointmentStatus ? `cập nhật Hẹn khách là '${appointmentStatus}'` : `đã xóa Hẹn khách (trước đó là '${selectedLead.appointmentStatus}')`;
-                                  const entry = `[LOG][${timestamp}] ${username}: ${actionText}`;
-                                  const updatedHistory = [...(selectedLead.history || []), entry];
-                                  await updateLead(selectedLead.id, { appointmentStatus, history: updatedHistory }, user.email);
-                                  setSelectedLead({ ...selectedLead, appointmentStatus, history: updatedHistory });
-                                }}
-                                className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
-                                  isAppointmentStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500 bg-white'
-                                }`}
-                              >
-                                <option value="">Chọn trạng thái hẹn</option>
-                                {appointmentOptions.map(o => (
-                                  <option key={o} value={o}>{o}</option>
-                                ))}
-                              </select>
-                            </div>
-                            {selectedLead.appointmentStatus && (
-                              <div>
-                                <label className="block text-xs text-slate-500 mb-1">Kết quả</label>
-                                <select 
-                                  value={selectedLead.resultStatus || ''}
-                                  disabled={isResultStatusDisabled}
-                                  onChange={async (e) => {
-                                    const resultStatus = e.target.value;
-                                    const timestamp = new Date().toLocaleString('vi-VN');
-                                    const username = user.displayName || user.email;
-                                    const actionText = resultStatus ? `cập nhật Kết quả là '${resultStatus}'` : `đã xóa Kết quả (trước đó là '${selectedLead.resultStatus}')`;
-                                    const entry = `[LOG][${timestamp}] ${username}: ${actionText}`;
-                                    const updatedHistory = [...(selectedLead.history || []), entry];
-                                    await updateLead(selectedLead.id, { resultStatus, history: updatedHistory }, user.email);
-                                    setSelectedLead({ ...selectedLead, resultStatus, history: updatedHistory });
-                                  }}
-                                  className={`w-full px-4 py-2 rounded-xl border border-slate-200 outline-none transition-all ${
-                                    isResultStatusDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-emerald-500 bg-white'
-                                  }`}
-                                >
-                                  <option value="">Chọn kết quả</option>
-                                  {resultOptions.map(o => (
-                                    <option key={o} value={o}>{o}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
+                    const hasCustomStatus = currentChainParts.length > 0;
+
+                    if (!hasCustomStatus) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={handleOpenStatusModal}
+                          className="w-full py-3.5 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group mb-5 cursor-pointer"
+                        >
+                          <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                          <span>Cập nhật thông tin</span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <div 
+                        onClick={handleOpenStatusModal}
+                        className="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 rounded-2xl transition-all cursor-pointer group mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                          {currentChainParts.map((part, idx) => (
+                            <React.Fragment key={idx}>
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                idx === 0 
+                                  ? 'bg-emerald-600 text-white shadow-xs' 
+                                  : idx === 1 
+                                  ? 'bg-blue-600 text-white shadow-xs' 
+                                  : idx === 2 
+                                  ? 'bg-indigo-600 text-white shadow-xs' 
+                                  : 'bg-purple-600 text-white shadow-xs'
+                              }`}>
+                                {part}
+                              </span>
+                              {idx < currentChainParts.length - 1 && (
+                                <span className="text-slate-400 font-bold text-xs">›</span>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 shrink-0 self-end sm:self-auto group-hover:underline">
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Thay đổi</span>
+                        </div>
+                      </div>
                     );
                   })()}
                   <div className="space-y-4">
@@ -1755,6 +1766,210 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Update Status Modal */}
+      {showStatusModal && selectedLead && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Cập nhật thông tin</h3>
+                  <p className="text-xs text-slate-500 font-medium">{selectedLead.customerName} - {selectedLead.phone}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowStatusModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="py-4 space-y-4 overflow-y-auto flex-1 pr-1">
+              {/* Select 1: Trạng thái */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  1. Trạng thái <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={statusForm.status}
+                  onChange={(e) => {
+                    const nextStatus = e.target.value;
+                    setStatusForm({
+                      ...statusForm,
+                      status: nextStatus,
+                      subStatus: '',
+                      appointmentStatus: '',
+                      resultStatus: ''
+                    });
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
+                >
+                  <option value="Chưa liên hệ">Chưa liên hệ</option>
+                  <option value="Không liên hệ được">Không liên hệ được</option>
+                  <option value="Đã liên hệ">Đã liên hệ</option>
+                </select>
+              </div>
+
+              {/* Select 2: Chi tiết trạng thái */}
+              {statusForm.status && subStatuses[statusForm.status as keyof typeof subStatuses] && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    2. Chi tiết trạng thái <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={statusForm.subStatus}
+                    onChange={(e) => {
+                      const nextSub = e.target.value;
+                      setStatusForm({
+                        ...statusForm,
+                        subStatus: nextSub,
+                        appointmentStatus: '',
+                        resultStatus: ''
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
+                  >
+                    <option value="">-- Vui lòng chọn chi tiết trạng thái --</option>
+                    {subStatuses[statusForm.status as keyof typeof subStatuses].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Select 3: Hẹn khách (chỉ khi Đã liên hệ -> Đang tư vấn) */}
+              {statusForm.status === 'Đã liên hệ' && statusForm.subStatus === 'Đang tư vấn' && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    3. Hẹn khách <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={statusForm.appointmentStatus}
+                    onChange={(e) => {
+                      setStatusForm({
+                        ...statusForm,
+                        appointmentStatus: e.target.value,
+                        resultStatus: ''
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
+                  >
+                    <option value="">-- Vui lòng chọn trạng thái hẹn --</option>
+                    {appointmentOptions.map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Select 4: Kết quả (chỉ khi Đã liên hệ -> Đang tư vấn -> đã chọn Hẹn khách) */}
+              {statusForm.status === 'Đã liên hệ' && statusForm.subStatus === 'Đang tư vấn' && statusForm.appointmentStatus && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    4. Kết quả <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={statusForm.resultStatus}
+                    onChange={(e) => {
+                      setStatusForm({
+                        ...statusForm,
+                        resultStatus: e.target.value
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
+                  >
+                    <option value="">-- Vui lòng chọn kết quả --</option>
+                    {resultOptions.map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Ghi chú Note */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Ghi chú trao đổi <span className="text-slate-400 font-normal normal-case">(Tùy chọn)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={statusForm.note}
+                  onChange={(e) => setStatusForm({ ...statusForm, note: e.target.value })}
+                  placeholder="Nhập nội dung trao đổi hoặc ghi chú cho lần cập nhật này..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm resize-none"
+                />
+              </div>
+
+              {/* Chuỗi tóm tắt Preview */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Lịch sử sẽ ghi nhận:</p>
+                <p className="text-xs font-medium text-slate-700 break-words">
+                  Cập nhật trạng thái "{[
+                    statusForm.status,
+                    statusForm.subStatus,
+                    statusForm.appointmentStatus,
+                    statusForm.resultStatus
+                  ].filter(Boolean).join(' > ')}"
+                  {statusForm.note.trim() ? ` (note: ${statusForm.note.trim()})` : ''}
+                </p>
+              </div>
+
+              {/* Warning if incomplete */}
+              {!isStatusFormValid() && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs font-medium flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Vui lòng chọn đầy đủ thông tin của tất cả các bước để có thể lưu.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(false)}
+                className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={!isStatusFormValid() || isSavingStatus}
+                onClick={handleSaveStatusModal}
+                className={`px-5 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-2 ${
+                  !isStatusFormValid() || isSavingStatus
+                    ? 'bg-slate-300 cursor-not-allowed text-slate-500 shadow-none'
+                    : 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer shadow-emerald-200'
+                }`}
+              >
+                {isSavingStatus ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang lưu...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Xác nhận & Lưu</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 
