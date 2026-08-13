@@ -227,47 +227,62 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     return allowedDepartments.map(d => d.id);
   }, [selectedDeptId, allowedDepartments, getSubDeptIdsRecursive]);
 
-  // Fetch initial Page 1 (20 items) and JSON stats
-  const refreshLeadsAndStats = React.useCallback(async () => {
+  // 1. Fetch Stats Summary (Only runs on project/dept/search change or mutation - NOT on tab change)
+  const loadStats = React.useCallback(async () => {
+    try {
+      const statsRes = await fetchLeadStats({
+        role: user.role,
+        userEmail: user.email,
+        departmentIds: activeSubDeptIds,
+        projectId: selectedProjectId,
+        assignFilter,
+        searchTerm
+      });
+      setStatsSummary(statsRes);
+    } catch (e) {
+      console.error('Error fetching stats:', e);
+    }
+  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, assignFilter, searchTerm]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // 2. Fetch 20 Leads for currently active Tab (Runs when currentTab OR filters change - EXACTLY 1 API call per tab)
+  const loadTabLeads = React.useCallback(async () => {
     setIsLoadingLeads(true);
     setPage(1);
     try {
-      const [paginatedRes, statsRes] = await Promise.all([
-        fetchPaginatedLeads({
-          role: user.role,
-          userEmail: user.email,
-          departmentIds: activeSubDeptIds,
-          projectId: selectedProjectId,
-          status: currentTab,
-          assignFilter,
-          searchTerm,
-          page: 1,
-          limit: 20
-        }),
-        fetchLeadStats({
-          role: user.role,
-          userEmail: user.email,
-          departmentIds: activeSubDeptIds,
-          projectId: selectedProjectId,
-          assignFilter,
-          searchTerm
-        })
-      ]);
+      const paginatedRes = await fetchPaginatedLeads({
+        role: user.role,
+        userEmail: user.email,
+        departmentIds: activeSubDeptIds,
+        projectId: selectedProjectId,
+        status: currentTab,
+        assignFilter,
+        searchTerm,
+        page: 1,
+        limit: 20
+      });
 
       setDisplayedLeads(paginatedRes.leads);
       setHasMore(paginatedRes.hasMore);
       setTotalCount(paginatedRes.totalCount);
-      setStatsSummary(statsRes);
     } catch (e) {
-      console.error('Error fetching paginated leads / stats:', e);
+      console.error('Error fetching tab leads:', e);
     } finally {
       setIsLoadingLeads(false);
     }
   }, [user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm]);
 
   useEffect(() => {
-    refreshLeadsAndStats();
-  }, [refreshLeadsAndStats]);
+    loadTabLeads();
+  }, [loadTabLeads]);
+
+  const refreshLeadsAndStats = React.useCallback(() => {
+    loadStats();
+    loadTabLeads();
+  }, [loadStats, loadTabLeads]);
 
   // Realtime subscription ping
   useEffect(() => {
