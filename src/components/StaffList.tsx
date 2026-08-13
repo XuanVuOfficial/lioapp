@@ -21,8 +21,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isCheckingZalo, setIsCheckingZalo] = useState(false);
-  const [isCheckingZaloEdit, setIsCheckingZaloEdit] = useState(false);
   const [zaloPreviewData, setZaloPreviewData] = useState<{
+    useridzalo: string;
+    zalo_name: string;
+    avatar: string;
+  } | null>(null);
+  const [zaloPreviewDataEdit, setZaloPreviewDataEdit] = useState<{
     useridzalo: string;
     zalo_name: string;
     avatar: string;
@@ -193,32 +197,37 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   };
 
   const handleCheckZaloEdit = async () => {
-    if (!editingUser || !editingUser.phone) {
-      alert('Vui lòng nhập Số điện thoại');
+    if (!editingUser) return;
+    if (!editingUser.displayName) {
+      alert('Vui lòng nhập Họ và tên nhân viên');
       return;
     }
+    if (!editingUser.phone) {
+      alert('Vui lòng nhập Số điện thoại Zalo');
+      return;
+    }
+
     const cleanPhone = editingUser.phone.trim();
     if (cleanPhone.length < 9) {
       alert('Vui lòng nhập Số điện thoại hợp lệ.');
       return;
     }
 
-    setIsCheckingZaloEdit(true);
+    setIsCheckingZalo(true);
     try {
       const res = await fetch(`https://n8n.thienlong.pro.vn/webhook/zalo-user?phone=${encodeURIComponent(cleanPhone)}`);
       if (!res.ok) {
         alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
-        setIsCheckingZaloEdit(false);
+        setIsCheckingZalo(false);
         return;
       }
       const data = await res.json();
       if (data && (data.useridzalo || data.zalo_name)) {
-        setEditingUser(prev => prev ? ({ 
-          ...prev, 
+        setZaloPreviewDataEdit({
           useridzalo: String(data.useridzalo || ''),
-          avatarUrl: prev.avatarUrl || data.avatar || undefined
-        }) : null);
-        alert(`Đã liên kết Zalo thành công!\n- Tên Zalo: ${data.zalo_name || ''}\n- ID Zalo: ${data.useridzalo || ''}`);
+          zalo_name: String(data.zalo_name || editingUser.displayName),
+          avatar: String(data.avatar || editingUser.avatarUrl || '')
+        });
       } else {
         alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
       }
@@ -226,7 +235,59 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       console.error('Error checking Zalo user edit:', err);
       alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
     } finally {
-      setIsCheckingZaloEdit(false);
+      setIsCheckingZalo(false);
+    }
+  };
+
+  const handleConfirmUpdateWithZalo = async () => {
+    if (!editingUser || !zaloPreviewDataEdit) return;
+    setIsLoading(true);
+    try {
+      const settings = await getAppSettings();
+      
+      const originalUser = users.find(u => u.uid === editingUser.uid);
+      if (
+        (editingUser.role !== originalUser?.role || editingUser.departmentId !== originalUser?.departmentId) &&
+        settings.roleLimits && settings.roleLimits[editingUser.role]
+      ) {
+        const limit = settings.roleLimits[editingUser.role] as number;
+        const currentCount = users.filter(u => u.departmentId === editingUser.departmentId && u.role === editingUser.role && u.uid !== editingUser.uid).length;
+        if (currentCount >= limit) {
+          alert(`Phòng ban này đã đạt giới hạn tối đa ${limit} nhân sự ở vai trò này.`);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      const updates: Partial<UserProfile> = {
+        displayName: editingUser.displayName,
+        role: editingUser.role,
+        departmentId: editingUser.departmentId || undefined,
+        updatedAt: Date.now(),
+        avatarUrl: editingUser.avatarUrl || zaloPreviewDataEdit.avatar || undefined,
+        hireDate: editingUser.hireDate || undefined,
+        phone: editingUser.phone.trim(),
+        useridzalo: zaloPreviewDataEdit.useridzalo
+      };
+      if (editingUser.password) {
+        updates.password = editingUser.password;
+        updates.mustChangePassword = true;
+      }
+      
+      await updateUserProfile(editingUser.uid, updates);
+      
+      if (editingUser.departmentId && editingUser.role !== 'staff') {
+        await updateDepartment(editingUser.departmentId, {
+          managerName: editingUser.displayName
+        });
+      }
+
+      setZaloPreviewDataEdit(null);
+      setEditingUser(null);
+    } catch (error: any) {
+      alert('Lỗi khi cập nhật tài khoản: ' + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -260,9 +321,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         departmentId: editingUser.departmentId || undefined,
         updatedAt: Date.now(),
         avatarUrl: editingUser.avatarUrl || undefined,
-        hireDate: editingUser.hireDate || undefined,
-        phone: editingUser.phone ? editingUser.phone.trim() : undefined,
-        useridzalo: editingUser.useridzalo || undefined
+        hireDate: editingUser.hireDate || undefined
       };
       if (editingUser.password) {
         updates.password = editingUser.password;
@@ -881,35 +940,18 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại Zalo</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={editingUser.phone || ''}
-                      onChange={e => setEditingUser(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
-                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                      placeholder="vd: 0912345678"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCheckZaloEdit}
-                      disabled={isCheckingZaloEdit || !editingUser.phone}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs transition-all shadow-sm shrink-0 flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      {isCheckingZaloEdit ? (
-                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <Search className="w-3.5 h-3.5" />
-                      )}
-                      Kiểm tra Zalo
-                    </button>
-                  </div>
-                  {editingUser.useridzalo ? (
-                    <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Đã liên kết Zalo ID: {editingUser.useridzalo}
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại Zalo *</label>
+                  <input 
+                    type="text" 
+                    value={editingUser.phone || ''}
+                    onChange={e => setEditingUser(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    placeholder="vd: 0912345678"
+                  />
+                  {editingUser.useridzalo && (
+                    <p className="text-xs text-blue-600 mt-1 font-mono font-medium flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-blue-600" /> ID Zalo hiện tại: {editingUser.useridzalo}
                     </p>
-                  ) : (
-                    <p className="text-[11px] text-slate-400 mt-1">Chưa liên kết ID Zalo. Bấm kiểm tra để liên kết.</p>
                   )}
                 </div>
                 <div>
@@ -987,7 +1029,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 )}
 
                 {/* Phòng Selection */}
-                {['staff', 'tp'].includes(editingUser.role) && selectedFloorIdEdit && (
+                {['staff', 'tp'].includes(editingUser.role) && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Thuộc phòng</label>
                     <select 
@@ -1046,16 +1088,70 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   Hủy
                 </button>
                 <button 
-                  onClick={handleUpdate}
-                  className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100"
+                  onClick={handleCheckZaloEdit}
+                  disabled={isCheckingZalo}
+                  className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-lg shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Lưu thay đổi
+                  {isCheckingZalo ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : null}
+                  Kiểm tra
                 </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      {/* Zalo User Preview & Confirmation Modal for Edit */}
+      {zaloPreviewDataEdit && editingUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-center"
+          >
+            <div className="w-20 h-20 rounded-full mx-auto mb-4 overflow-hidden border-4 border-blue-100 shadow-md bg-slate-100 flex items-center justify-center">
+              {zaloPreviewDataEdit.avatar ? (
+                <img src={zaloPreviewDataEdit.avatar} alt="Zalo Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <User className="w-10 h-10 text-slate-400" />
+              )}
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold text-xs mb-2">
+              <Check className="w-3.5 h-3.5" /> Đã xác thực tài khoản Zalo
+            </div>
+
+            <h3 className="text-xl font-bold text-slate-900 mb-1">{zaloPreviewDataEdit.zalo_name}</h3>
+            <p className="text-xs text-slate-500 font-mono mb-4">ID Zalo: {zaloPreviewDataEdit.useridzalo}</p>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-left space-y-2 mb-6">
+              <p className="text-xs text-slate-500"><strong className="text-slate-700">SĐT Zalo:</strong> {editingUser.phone}</p>
+              <p className="text-xs text-slate-500"><strong className="text-slate-700">Họ và tên:</strong> {editingUser.displayName}</p>
+              <p className="text-xs text-slate-500"><strong className="text-slate-700">Email:</strong> {editingUser.email}</p>
+              <p className="text-xs text-slate-500"><strong className="text-slate-700">Vai trò:</strong> {getSystemRole(editingUser.role)}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setZaloPreviewDataEdit(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-all"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmUpdateWithZalo}
+                disabled={isLoading}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
+              >
+                {isLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                Xác nhận cập nhật
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Info Modal */}
       <AnimatePresence>
