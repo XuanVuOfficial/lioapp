@@ -76,15 +76,23 @@ export const updateUserRole = async (uid: string, role: UserRole, departmentId?:
 };
 
 export const subscribeToUsersByDepartment = (departmentId: string, callback: (users: UserProfile[]) => void) => {
-  return subscribeDB(`SELECT * FROM users WHERE departmentId = ${escapeSQL(departmentId)} ORDER BY createdAt DESC LIMIT 500`, (data: any[]) => {
-    callback(data.map(parseUser));
-  }, 5000);
+  let isMounted = true;
+  queryDB(`SELECT * FROM users WHERE departmentId = ${escapeSQL(departmentId)} ORDER BY createdAt DESC LIMIT 500`).then((data: any[]) => {
+    if (isMounted && Array.isArray(data)) {
+      callback(data.map(parseUser));
+    }
+  }).catch(e => console.error('subscribeToUsersByDepartment error', e));
+  return () => { isMounted = false; };
 };
 
 export const subscribeToAllUsers = (callback: (users: UserProfile[]) => void) => {
-  return subscribeDB(`SELECT * FROM users ORDER BY createdAt DESC LIMIT 500`, (data: any[]) => {
-    callback(data.map(parseUser));
-  }, 5000);
+  let isMounted = true;
+  queryDB(`SELECT * FROM users ORDER BY createdAt DESC LIMIT 500`).then((data: any[]) => {
+    if (isMounted && Array.isArray(data)) {
+      callback(data.map(parseUser));
+    }
+  }).catch(e => console.error('subscribeToAllUsers error', e));
+  return () => { isMounted = false; };
 };
 
 export const deleteUser = async (user: UserProfile): Promise<void> => {

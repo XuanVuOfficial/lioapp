@@ -187,31 +187,81 @@ export const deleteLead = async (lead: Lead): Promise<void> => {
   await executeMutation('leads', 'DELETE', lead, `DELETE FROM leads WHERE id = ${escapeSQL(lead.id)} LIMIT 1`);
 };
 
-export const subscribeToLeads = (role: UserRole, email: string, departmentIds: string[] | undefined, callback: (leads: Lead[]) => void) => {
+export const subscribeToLeads = (
+  role: UserRole,
+  email: string,
+  departmentIds: string[] | undefined,
+  callback: (leads: Lead[]) => void,
+  intervalMs: number = 5000
+) => {
   let whereClause = '';
   if (departmentIds && departmentIds.length > 0 && departmentIds.length <= 10) {
     const ids = departmentIds.map(id => escapeSQL(id)).join(', ');
     whereClause = `WHERE departmentId IN (${ids})`;
   }
 
-  const sql = `SELECT * FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT 1000`;
+  let isMounted = true;
+  let lastPingState = '';
+  let isFetching = false;
 
-  return subscribeDB(sql, (data: any[]) => {
-    let leads = data.map(parseLead);
+  const fetchFullLeads = async () => {
+    if (isFetching) return;
+    isFetching = true;
+    try {
+      const sql = `SELECT * FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT 1000`;
+      const data = await queryDB(sql);
+      if (isMounted && Array.isArray(data)) {
+        let leads = data.map(parseLead);
 
-    if (['tgd', 'admin'].includes(role)) {
-      // Sees everything
-    } else if (['gds', 'tp'].includes(role)) {
-      if (departmentIds) {
-        leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
+        if (['tgd', 'admin'].includes(role)) {
+          // Sees everything
+        } else if (['gds', 'tp'].includes(role)) {
+          if (departmentIds) {
+            leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
+          }
+        } else if (role === 'staff') {
+          leads = leads.filter(l =>
+            (departmentIds && l.departmentId && departmentIds.includes(l.departmentId)) &&
+            (l.assignedToEmail === email || l.creatorEmail === email)
+          );
+        }
+
+        callback(leads);
       }
-    } else if (role === 'staff') {
-      leads = leads.filter(l =>
-        (departmentIds && l.departmentId && departmentIds.includes(l.departmentId)) &&
-        (l.assignedToEmail === email || l.creatorEmail === email)
-      );
+    } catch (e) {
+      console.error('fetchFullLeads error', e);
+    } finally {
+      isFetching = false;
     }
+  };
 
-    callback(leads);
-  }, 5000);
+  const pingCheck = async () => {
+    try {
+      // Lightweight Ping: check total count & MAX(updatedAt) without pulling heavy lead payload
+      const pingSql = `SELECT COUNT(*) as total, MAX(updatedAt) as maxUpdated FROM leads ${whereClause}`;
+      const res = await queryDB(pingSql);
+      if (isMounted && Array.isArray(res) && res.length > 0) {
+        const currentState = `${res[0].total || 0}_${res[0].maxUpdated || ''}`;
+        if (currentState !== lastPingState) {
+          lastPingState = currentState;
+          await fetchFullLeads();
+        }
+      } else if (isMounted) {
+        await fetchFullLeads();
+      }
+    } catch (e) {
+      console.error('pingCheck leads error', e);
+      if (isMounted && !lastPingState) {
+        await fetchFullLeads();
+      }
+    }
+  };
+
+  pingCheck();
+  const interval = setInterval(pingCheck, intervalMs);
+
+  return () => {
+    isMounted = false;
+    clearInterval(interval);
+  };
 };

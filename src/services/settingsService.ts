@@ -63,11 +63,11 @@ export const updateAppSettings = async (settings: AppSettings): Promise<void> =>
 };
 
 export const subscribeToSettings = (callback: (settings: AppSettings) => void) => {
-  return subscribeDB(`SELECT * FROM settings WHERE id = ${escapeSQL(DOC_ID)} LIMIT 1`, (data: any[]) => {
-    if (data && data.length > 0) {
-      callback(parseSettings(data[0]));
-    } else {
-      callback(DEFAULT_SETTINGS);
-    }
-  }, 10000);
+  let isMounted = true;
+  getAppSettings().then(settings => {
+    if (isMounted) callback(settings);
+  }).catch(() => {
+    if (isMounted) callback(DEFAULT_SETTINGS);
+  });
+  return () => { isMounted = false; };
 };

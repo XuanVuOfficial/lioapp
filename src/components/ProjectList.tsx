@@ -17,10 +17,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = subscribeDB('SELECT * FROM projects ORDER BY createdAt DESC LIMIT 100', (data: any[]) => {
-      setProjects(data as Project[]);
-      setLoading(false);
-    }, 5000);
+    let isMounted = true;
+    queryDB('SELECT * FROM projects ORDER BY createdAt DESC LIMIT 100').then((data: any[]) => {
+      if (isMounted && Array.isArray(data)) {
+        setProjects(data as Project[]);
+        setLoading(false);
+      }
+    }).catch(e => console.error('fetch projects error', e));
 
     const unsubMutations = subscribeToMutations((event) => {
        if (event.entity === 'projects') {
@@ -37,7 +40,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
     });
 
     return () => {
-      unsubscribe();
+      isMounted = false;
       unsubMutations();
     };
   }, [user]);
