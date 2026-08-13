@@ -158,6 +158,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       } : null);
       setDisplayedLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, ...updates, isUpdatedByAssignee: true } : l));
       setShowStatusModal(false);
+      loadTabLeads();
+      if (showStats) {
+        loadStats();
+      }
     } catch (err: any) {
       alert('Lỗi khi cập nhật trạng thái: ' + (err.message || err));
     } finally {
@@ -653,16 +657,34 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     setShowAddModal(false);
     setNewLead({ status: 'Chưa liên hệ', subStatus: '', appointmentStatus: '', resultStatus: '', departmentId: user.departmentId || '', projectId: '', assignedToEmail: '' });
     setSelectedAssignDeptId('');
+    await loadTabLeads();
+    if (showStats) {
+      loadStats();
+    }
   };
 
   const handleUpdateStatus = async (lead: Lead, status: string) => {
-    await updateLead(lead.id, { status }, user.email);
+    setDisplayedLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status } : l));
     if (selectedLead && selectedLead.id === lead.id) {
       setSelectedLead({ ...selectedLead, status });
+    }
+    await updateLead(lead.id, { status }, user.email);
+    loadTabLeads();
+    if (showStats) {
+      loadStats();
     }
   };
 
   const handleAssign = async (lead: Lead, staffEmail?: string, deptId?: string) => {
+    const updates = {
+      assignedToEmail: staffEmail || '',
+      departmentId: deptId || lead.departmentId,
+      assignedAt: staffEmail ? new Date().toISOString() : undefined,
+      isUpdatedByAssignee: false
+    };
+    setDisplayedLeads(prev => prev.map(l => l.id === lead.id ? { ...l, ...updates } : l));
+    setSelectedLead(prev => prev && prev.id === lead.id ? { ...prev, ...updates } : prev);
+
     await assignLead(lead.id, staffEmail, deptId, user.email);
     if (selectedLead && selectedLead.id === lead.id) {
       try {
@@ -675,14 +697,24 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       }
     }
     setShowAssignModal(null);
+    loadTabLeads();
+    if (showStats) {
+      loadStats();
+    }
   };
 
   const handleDeleteLead = async (lead: Lead) => {
     if (window.confirm(`Bạn có chắc chắn muốn xoá khách hàng "${lead.customerName}" không?`)) {
-      await deleteLead(lead);
+      setDisplayedLeads(prev => prev.filter(l => l.id !== lead.id));
+      setTotalCount(prev => Math.max(0, prev - 1));
       setActionMenuOpenId(null);
       if (selectedLead?.id === lead.id) {
         setSelectedLead(null);
+      }
+      await deleteLead(lead);
+      loadTabLeads();
+      if (showStats) {
+        loadStats();
       }
     }
   };
@@ -1476,13 +1508,23 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   const username = user.displayName || user.email;
                   const entry = `[LOG][${timestamp}] ${username}: cập nhật thông tin (Tên: ${leadToEdit.customerName}, SĐT: ${leadToEdit.phone})`;
                   const updatedHistory = [...(leadToEdit.history || []), entry];
-                  await updateLead(leadToEdit.id, { 
+                  const updates = { 
                     customerName: leadToEdit.customerName, 
                     phone: leadToEdit.phone,
                     email: leadToEdit.email,
                     history: updatedHistory
-                  }, user.email);
+                  };
+
+                  // Optimistic UI updates
+                  setDisplayedLeads(prev => prev.map(l => l.id === leadToEdit.id ? { ...l, ...updates } : l));
+                  setSelectedLead(prev => prev && prev.id === leadToEdit.id ? { ...prev, ...updates } : prev);
                   setLeadToEdit(null);
+
+                  await updateLead(leadToEdit.id, updates, user.email);
+                  loadTabLeads();
+                  if (showStats) {
+                    loadStats();
+                  }
                 }}
                 className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100"
               >
