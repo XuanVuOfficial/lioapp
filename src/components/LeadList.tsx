@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2 } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadStats, fetchPaginatedLeads, LeadStatsSummary, subscribeToLeadChanges } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
@@ -58,9 +58,15 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   // Export Excel Modal State
   const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [exportStartDate, setExportStartDate] = useState<string>('');
   const [exportEndDate, setExportEndDate] = useState<string>('');
   const [presetSelected, setPresetSelected] = useState<string>('month');
+
+  // Stats Date Filter State
+  const [statsStartDate, setStatsStartDate] = useState<string>('');
+  const [statsEndDate, setStatsEndDate] = useState<string>('');
+  const [statsPresetSelected, setStatsPresetSelected] = useState<string>('all');
 
   // Search Picker Modal State
   const [searchPickerModal, setSearchPickerModal] = useState<{
@@ -227,7 +233,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     return allowedDepartments.map(d => d.id);
   }, [selectedDeptId, allowedDepartments, getSubDeptIdsRecursive]);
 
-  // 1. Fetch Stats Summary (Lazy loaded ONLY when clicking "Thống kê" - NOT on page load/filter/tab change)
+  // 1. Fetch Stats Summary (Lazy loaded ONLY when clicking "Thống kê" or changing stats date filter)
   const loadStats = React.useCallback(async () => {
     try {
       const statsRes = await fetchLeadStats({
@@ -236,13 +242,55 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         departmentIds: activeSubDeptIds,
         projectId: selectedProjectId,
         assignFilter,
-        searchTerm
+        searchTerm,
+        startDate: statsStartDate || undefined,
+        endDate: statsEndDate || undefined
       });
       setStatsSummary(statsRes);
     } catch (e) {
       console.error('Error fetching stats:', e);
     }
-  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, assignFilter, searchTerm]);
+  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, assignFilter, searchTerm, statsStartDate, statsEndDate]);
+
+  useEffect(() => {
+    if (showStats) {
+      loadStats();
+    }
+  }, [showStats, loadStats]);
+
+  const applyStatsPreset = (preset: string) => {
+    setStatsPresetSelected(preset);
+    const now = new Date();
+    let startStr = '';
+    let endStr = '';
+
+    if (preset === '3days') {
+      const start = new Date();
+      start.setDate(now.getDate() - 2);
+      startStr = start.toISOString().split('T')[0];
+      endStr = now.toISOString().split('T')[0];
+    } else if (preset === '7days') {
+      const start = new Date();
+      start.setDate(now.getDate() - 6);
+      startStr = start.toISOString().split('T')[0];
+      endStr = now.toISOString().split('T')[0];
+    } else if (preset === '30days') {
+      const start = new Date();
+      start.setDate(now.getDate() - 29);
+      startStr = start.toISOString().split('T')[0];
+      endStr = now.toISOString().split('T')[0];
+    } else if (preset === 'month') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      startStr = firstDay.toISOString().split('T')[0];
+      endStr = now.toISOString().split('T')[0];
+    } else if (preset === 'all') {
+      startStr = '';
+      endStr = '';
+    }
+
+    setStatsStartDate(startStr);
+    setStatsEndDate(endStr);
+  };
 
   // 2. Fetch 20 Leads for currently active Tab (FAST: Exactly 1 single 20-item query per tab/filter)
   const loadTabLeads = React.useCallback(async () => {
@@ -392,10 +440,11 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   };
 
   const handleConfirmExport = async () => {
+    setIsExporting(true);
     try {
       const leadsToExport = await getLeadsToExport();
       if (leadsToExport.length === 0) {
-        alert('Không có dữ liệu khách hàng nào trong khoảng thời gian đã chọn.');
+        alert('Không có dữ liệu khách hàng nào phù hợp với khoảng thời gian và bộ lọc đã chọn.');
         return;
       }
       const projName = projects.find(p => p.id === selectedProjectId)?.name;
@@ -408,6 +457,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       setShowExportModal(false);
     } catch (e: any) {
       alert('Lỗi khi xuất excel: ' + e.message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -692,7 +743,63 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       </motion.div>
 
       {showStats ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          {/* Date Filter Bar for Statistics */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Calendar className="w-4 h-4 text-emerald-600" />
+              <span>Thời gian thống kê:</span>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date"
+                  value={statsStartDate}
+                  onChange={e => {
+                    setStatsStartDate(e.target.value);
+                    setStatsPresetSelected('');
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 font-medium text-slate-700"
+                />
+                <span className="text-xs text-slate-400 font-medium">đến</span>
+                <input 
+                  type="date"
+                  value={statsEndDate}
+                  onChange={e => {
+                    setStatsEndDate(e.target.value);
+                    setStatsPresetSelected('');
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 font-medium text-slate-700"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: '3days', label: '3 ngày' },
+                  { id: '7days', label: '7 ngày' },
+                  { id: '30days', label: '30 ngày' },
+                  { id: 'month', label: 'Tháng này' },
+                  { id: 'all', label: 'Tất cả' }
+                ].map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applyStatsPreset(p.id)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                      statsPresetSelected === p.id
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 mb-6">Thống kê theo Trạng thái</h3>
             <div className="h-[300px] w-full">
@@ -766,6 +873,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             </div>
           </div>
         </div>
+      </div>
       ) : (
         <>
           <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
@@ -1731,11 +1839,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               </div>
 
               {/* Record count preview */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                <span>Số lượng bản ghi sẽ xuất:</span>
-                <span className="font-bold text-emerald-600 text-sm">
-                  {getLeadsToExport().length} / {filteredLeads.length} khách hàng
-                </span>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col gap-1 text-xs text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span>Phạm vi áp dụng:</span>
+                  <span className="font-bold text-emerald-700">
+                    Tab: {currentTab} {selectedProjectId ? `· ${projects.find(p => p.id === selectedProjectId)?.abbreviation || 'Dự án'}` : ''}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 italic mt-0.5">
+                  Dữ liệu sẽ được lọc đầy đủ theo thời gian, bộ lọc dự án/nhân viên và phân quyền ({getRoleName(user.role)}).
+                </p>
               </div>
             </div>
 
@@ -1743,18 +1856,29 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
               <button
                 type="button"
+                disabled={isExporting}
                 onClick={() => setShowExportModal(false)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all disabled:opacity-50"
               >
                 Hủy
               </button>
               <button
                 type="button"
+                disabled={isExporting}
                 onClick={handleConfirmExport}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-semibold text-sm transition-all shadow-md shadow-emerald-100"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-semibold text-sm transition-all shadow-md shadow-emerald-100 disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
-                Xác nhận xuất Excel
+                {isExporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang tạo tệp Excel...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Xác nhận xuất Excel</span>
+                  </>
+                )}
               </button>
             </div>
           </motion.div>

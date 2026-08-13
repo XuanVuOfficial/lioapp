@@ -227,6 +227,8 @@ export interface LeadFilterOptions {
   searchTerm?: string;
   selectedDeptId?: string;
   subDeptIds?: string[];
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
 }
 
 export interface FetchPaginatedLeadsParams extends LeadFilterOptions {
@@ -289,6 +291,16 @@ export const buildBaseWhereClause = (options: LeadFilterOptions, includeStatus: 
     const term = `%${options.searchTerm.trim()}%`;
     const termEsc = escapeSQL(term);
     conditions.push(`(customerName LIKE ${termEsc} OR phone LIKE ${termEsc} OR email LIKE ${termEsc})`);
+  }
+
+  // Date Range Filter
+  if (options.startDate) {
+    const startEsc = escapeSQL(options.startDate + ' 00:00:00');
+    conditions.push(`createdAt >= ${startEsc}`);
+  }
+  if (options.endDate) {
+    const endEsc = escapeSQL(options.endDate + ' 23:59:59');
+    conditions.push(`createdAt <= ${endEsc}`);
   }
 
   return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
