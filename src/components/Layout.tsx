@@ -57,6 +57,18 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
     return navItems.filter(item => allowedTabs.includes(item.id));
   }, [user, settings]);
 
+  const mobileNavItems = React.useMemo(() => {
+    const top4 = filteredNavItems.slice(0, 4);
+    if (top4.some(item => item.id === activeTab)) {
+      return top4;
+    }
+    const currentItem = filteredNavItems.find(item => item.id === activeTab);
+    if (currentItem) {
+      return [...filteredNavItems.slice(0, 3), currentItem];
+    }
+    return top4;
+  }, [filteredNavItems, activeTab]);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -259,9 +271,9 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation (Tối đa 4 tab) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-2 flex items-center justify-around z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-        {filteredNavItems.map(item => (
+        {mobileNavItems.map(item => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
