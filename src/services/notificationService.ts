@@ -20,7 +20,7 @@ const VAPID_KEY = "BNphtTRAaQyDZZghboo4RYxGMtP66-O2Fw02PuPrsceXa-UhEz3xz4LA2cMfU
 /**
  * Register user for official Firebase FCM push notifications via Node backend
  */
-export const registerNotifications = async (email: string) => {
+export const registerNotifications = async (email: string, forceRegister: boolean = false) => {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
     console.warn('Push notifications or Service Workers are not supported in this environment.');
     return;
@@ -30,7 +30,7 @@ export const registerNotifications = async (email: string) => {
   const cacheKey = `fcm_registered_${email}`;
   const cachedToken = localStorage.getItem(cacheKey);
 
-  if (cachedToken && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+  if (!forceRegister && cachedToken && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     console.log(`[FCM] Device registered in cache for ${email}. Background syncing to MySQL...`);
     fetch(REGISTER_TOKEN_ENDPOINT, {
       method: 'POST',

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings as SettingsIcon, LayoutDashboard, UserPlus, Briefcase, Users, UserCircle, Save, Check } from 'lucide-react';
+import { Settings as SettingsIcon, LayoutDashboard, UserPlus, Briefcase, Users, UserCircle, Save, Check, Bell } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { AppSettings, updateAppSettings, getAppSettings } from '../services/settingsService';
 
@@ -27,6 +27,7 @@ export const Settings: React.FC<Props> = ({ user }) => {
     { id: 'projects', label: 'Dự án', icon: Briefcase },
     { id: 'departments', label: 'Phòng ban', icon: Users },
     { id: 'staff', label: 'Nhân viên', icon: UserCircle },
+    { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'settings', label: 'Cài đặt', icon: SettingsIcon },
   ];
 

@@ -16,6 +16,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
 import { MandatoryZaloModal } from './components/MandatoryZaloModal';
+import { SoftNotificationModal } from './components/SoftNotificationModal';
+import { NotificationSettings } from './components/NotificationSettings';
 import { AppSettings, subscribeToSettings } from './services/settingsService';
 import { registerNotifications } from './services/notificationService';
 
@@ -235,6 +237,8 @@ export default function App() {
         );
       case 'staff':
         return <StaffList users={filteredStaff} departments={departments} currentUser={effectiveUser} />;
+      case 'notifications':
+        return <NotificationSettings user={effectiveUser} />;
       case 'settings':
         return <Settings user={effectiveUser} />;
       default:
@@ -255,10 +259,13 @@ export default function App() {
         {renderContent()}
       </Layout>
       {effectiveUser && (
-        <MandatoryZaloModal 
-          user={effectiveUser} 
-          onUpdateSuccess={(updatedUser) => setUser(updatedUser)} 
-        />
+        <>
+          <MandatoryZaloModal 
+            user={effectiveUser} 
+            onUpdateSuccess={(updatedUser) => setUser(updatedUser)} 
+          />
+          <SoftNotificationModal user={effectiveUser} />
+        </>
       )}
       <PWAInstallPrompt />
       <div 

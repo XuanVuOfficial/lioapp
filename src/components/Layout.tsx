@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save, Copy, Eye, EyeOff } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, Users, UserPlus, Briefcase, Menu, X, UserCircle, Settings as SettingsIcon, Edit2, Upload, Lock, Save, Copy, Eye, EyeOff, Bell } from 'lucide-react';
 import { UserProfile, Department } from '../types';
 import { AppSettings } from '../services/settingsService';
 import { updateUserProfile } from '../services/userService';
@@ -31,6 +31,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
     { id: 'projects', label: 'Dự án', icon: Briefcase },
     { id: 'departments', label: 'Phòng ban', icon: Users },
     { id: 'staff', label: 'Nhân viên', icon: UserCircle },
+    { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'settings', label: 'Cài đặt', icon: SettingsIcon },
   ];
 
@@ -54,7 +55,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, children, activeTab, setAc
       return navItems;
     }
     
-    return navItems.filter(item => allowedTabs.includes(item.id));
+    return navItems.filter(item => item.id === 'notifications' || allowedTabs.includes(item.id));
   }, [user, settings]);
 
   const mobileNavItems = React.useMemo(() => {
