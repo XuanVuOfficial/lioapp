@@ -397,8 +397,8 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   };
 
   const handleAssign = async (lead: Lead, staffEmail?: string, deptId?: string) => {
-    setShowAssignModal(null);
     await assignLead(lead.id, staffEmail, deptId, user.email);
+    setShowAssignModal(null);
   };
 
   const handleDeleteLead = async (lead: Lead) => {
