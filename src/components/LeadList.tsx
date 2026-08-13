@@ -78,7 +78,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   // Status Update Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusForm, setStatusForm] = useState({
-    status: 'Chưa liên hệ',
+    status: '',
     subStatus: '',
     appointmentStatus: '',
     resultStatus: '',
@@ -89,10 +89,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const handleOpenStatusModal = () => {
     if (!selectedLead) return;
     setStatusForm({
-      status: selectedLead.status || 'Chưa liên hệ',
-      subStatus: selectedLead.subStatus || '',
-      appointmentStatus: selectedLead.appointmentStatus || '',
-      resultStatus: selectedLead.resultStatus || '',
+      status: '',
+      subStatus: '',
+      appointmentStatus: '',
+      resultStatus: '',
       note: ''
     });
     setShowStatusModal(true);
@@ -100,9 +100,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const isStatusFormValid = () => {
     if (!statusForm.status) return false;
-    if (statusForm.status === 'Chưa liên hệ') {
-      return true;
-    }
     if (statusForm.status === 'Không liên hệ được') {
       return Boolean(statusForm.subStatus);
     }
@@ -1564,67 +1561,138 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 })()}
 
                 <section>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Cập nhật thông tin</h4>
                   </div>
                   {(() => {
-                    const currentChainParts: string[] = [];
-                    if (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
-                      currentChainParts.push(selectedLead.status);
-                      if (selectedLead.subStatus) currentChainParts.push(selectedLead.subStatus);
-                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
-                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
-                    } else if (selectedLead.subStatus) {
-                      currentChainParts.push(selectedLead.status || 'Chưa liên hệ');
-                      currentChainParts.push(selectedLead.subStatus);
-                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
-                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
+                    // Extract all status update logs from history
+                    const statusLogs: Array<{
+                      timeStr: string;
+                      dateStr: string;
+                      chain: string;
+                      note: string;
+                      isNotReachable: boolean;
+                    }> = [];
+
+                    for (const entry of selectedLead.history || []) {
+                      if (!entry.startsWith('[LOG]')) continue;
+                      const cleanEntry = entry.replace(/^\[LOG\]/, '');
+                      const matchNew = cleanEntry.match(/^\[(.*?)\]\s*([^:]+):\s*cập nhật trạng thái "([^"]+)"(?:\s*\(note:\s*(.*?)\))?/i);
+                      if (matchNew) {
+                        const fullTimestamp = matchNew[1];
+                        const chain = matchNew[3];
+                        const note = matchNew[4] || '';
+                        let timeStr = fullTimestamp;
+                        const timeMatch = fullTimestamp.match(/(\d{1,2}:\d{2})/);
+                        if (timeMatch) timeStr = timeMatch[1];
+                        statusLogs.push({
+                          timeStr,
+                          dateStr: fullTimestamp,
+                          chain,
+                          note,
+                          isNotReachable: chain.toLowerCase().includes('không liên hệ được')
+                        });
+                        continue;
+                      }
+                      const matchOld = cleanEntry.match(/^\[(.*?)\]\s*([^:]+):\s*cập nhật Trạng thái là '([^']+)'/i);
+                      if (matchOld) {
+                        const fullTimestamp = matchOld[1];
+                        const chain = matchOld[3];
+                        let timeStr = fullTimestamp;
+                        const timeMatch = fullTimestamp.match(/(\d{1,2}:\d{2})/);
+                        if (timeMatch) timeStr = timeMatch[1];
+                        statusLogs.push({
+                          timeStr,
+                          dateStr: fullTimestamp,
+                          chain,
+                          note: '',
+                          isNotReachable: chain.toLowerCase().includes('không liên hệ được')
+                        });
+                      }
                     }
 
-                    const hasCustomStatus = currentChainParts.length > 0;
-
-                    if (!hasCustomStatus) {
-                      return (
-                        <button
-                          type="button"
-                          onClick={handleOpenStatusModal}
-                          className="w-full py-3.5 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group mb-5 cursor-pointer"
-                        >
-                          <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                          <span>Cập nhật thông tin</span>
-                        </button>
-                      );
+                    // If no logs found in history, check current lead status
+                    let effectiveLogs = [...statusLogs];
+                    if (effectiveLogs.length === 0 && selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
+                      const timeStr = selectedLead.updatedAt ? new Date(selectedLead.updatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                      const chainParts = [selectedLead.status, selectedLead.subStatus, selectedLead.appointmentStatus, selectedLead.resultStatus].filter(Boolean);
+                      effectiveLogs.push({
+                        timeStr,
+                        dateStr: '',
+                        chain: chainParts.join(' > '),
+                        note: '',
+                        isNotReachable: selectedLead.status === 'Không liên hệ được'
+                      });
                     }
+
+                    const lastLog = effectiveLogs[effectiveLogs.length - 1];
+                    const isFinalConnected = lastLog ? !lastLog.isNotReachable : (selectedLead.status === 'Đã liên hệ');
+                    
+                    // In the list, previous attempts (or all attempts if still not reachable) are disabled
+                    const disabledLogs = isFinalConnected ? effectiveLogs.slice(0, -1) : effectiveLogs;
+                    const activeFinalLog = isFinalConnected ? effectiveLogs[effectiveLogs.length - 1] : null;
 
                     return (
-                      <div 
-                        onClick={handleOpenStatusModal}
-                        className="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 rounded-2xl transition-all cursor-pointer group mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
-                      >
-                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                          {currentChainParts.map((part, idx) => (
-                            <React.Fragment key={idx}>
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                idx === 0 
-                                  ? 'bg-emerald-600 text-white shadow-xs' 
-                                  : idx === 1 
-                                  ? 'bg-blue-600 text-white shadow-xs' 
-                                  : idx === 2 
-                                  ? 'bg-indigo-600 text-white shadow-xs' 
-                                  : 'bg-purple-600 text-white shadow-xs'
-                              }`}>
-                                {part}
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
+                        {/* Disabled Previous Attempt Cards */}
+                        {disabledLogs.map((log, idx) => (
+                          <div
+                            key={idx}
+                            className="px-2.5 py-1.5 bg-slate-100/90 border border-slate-200 rounded-xl flex flex-col justify-center min-w-[110px] max-w-[220px] shadow-2xs opacity-75 select-none"
+                            title={`Lần ${idx + 1} (${log.dateStr || log.timeStr}): ${log.chain}${log.note ? ` - note: ${log.note}` : ''}`}
+                          >
+                            <div className="flex items-center justify-between gap-1 text-[10px] text-slate-500 font-bold mb-0.5">
+                              <span className="flex items-center gap-0.5 font-mono text-[9px]">
+                                <Clock className="w-2.5 h-2.5 text-slate-400" />
+                                {log.timeStr}
                               </span>
-                              {idx < currentChainParts.length - 1 && (
-                                <span className="text-slate-400 font-bold text-xs">›</span>
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 shrink-0 self-end sm:self-auto group-hover:underline">
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>Thay đổi</span>
-                        </div>
+                              <span className="text-[8px] bg-slate-200 px-1 py-0.2 rounded font-semibold text-slate-600">
+                                Lần {idx + 1}
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-semibold text-slate-700 truncate leading-tight">
+                              {log.chain}
+                            </p>
+                          </div>
+                        ))}
+
+                        {/* Active Next Attempt Button (if not yet reached 'Đã liên hệ') */}
+                        {!isFinalConnected && (
+                          <button
+                            type="button"
+                            onClick={handleOpenStatusModal}
+                            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs shadow-xs hover:shadow-sm transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap group"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
+                            <span>
+                              {effectiveLogs.length === 0
+                                ? 'Cập nhật thông tin'
+                                : `Cập nhật thông tin lần ${effectiveLogs.length + 1}`}
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Final Success Card (if 'Đã liên hệ') */}
+                        {isFinalConnected && activeFinalLog && (
+                          <div
+                            onClick={handleOpenStatusModal}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-xl flex flex-col justify-center min-w-[130px] max-w-[280px] shadow-2xs transition-all cursor-pointer group"
+                            title={`Lần ${effectiveLogs.length} (${activeFinalLog.dateStr || activeFinalLog.timeStr}): ${activeFinalLog.chain}`}
+                          >
+                            <div className="flex items-center justify-between gap-1.5 text-[10px] text-emerald-700 font-bold mb-0.5">
+                              <span className="flex items-center gap-0.5 font-mono text-[9px]">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                {activeFinalLog.timeStr}
+                              </span>
+                              <span className="flex items-center gap-0.5 text-[8px] bg-emerald-200/80 px-1 py-0.2 rounded font-bold text-emerald-800 group-hover:underline">
+                                <Edit3 className="w-2.5 h-2.5" /> Sửa
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-bold text-emerald-900 truncate leading-tight">
+                              {activeFinalLog.chain}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -1818,7 +1886,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
                 >
-                  <option value="Chưa liên hệ">Chưa liên hệ</option>
+                  <option value="">-- Chọn trạng thái --</option>
                   <option value="Không liên hệ được">Không liên hệ được</option>
                   <option value="Đã liên hệ">Đã liên hệ</option>
                 </select>
