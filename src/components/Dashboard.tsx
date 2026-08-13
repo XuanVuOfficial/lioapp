@@ -290,9 +290,9 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
                 ))
               )}
             </div>
-          </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    )}
+  </div>
+);
 };
