@@ -66,7 +66,9 @@ export default function App() {
 
   useEffect(() => {
     if (user && user.email) {
-      registerNotifications(user.email);
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        registerNotifications(user.email);
+      }
     }
   }, [user]);
 
@@ -212,7 +214,12 @@ export default function App() {
   }
 
   if (!user) {
-    return <Auth onLogin={setUser} />;
+    return (
+      <>
+        <Auth onLogin={setUser} />
+        <PWAInstallPrompt />
+      </>
+    );
   }
 
   const renderContent = () => {

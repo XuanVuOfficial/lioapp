@@ -38,7 +38,7 @@ export const NotificationSettings: React.FC<Props> = ({ user }) => {
           checkStatus();
           alert('Đã đăng ký lại thông báo thành công!');
         } else {
-          alert('Vui lòng bật quyền thông báo trong cài đặt trình duyệt của bạn!');
+          alert('Vui lòng bật quyền thông báo trong cài đặt ứng dụng của bạn!');
         }
       }
     } catch (e: any) {
@@ -82,7 +82,7 @@ export const NotificationSettings: React.FC<Props> = ({ user }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Permission Status */}
         <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Quyền trình duyệt</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Quyền ứng dụng</p>
           <div className="flex items-center gap-2">
             {permissionState === 'granted' && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200">
@@ -101,9 +101,9 @@ export const NotificationSettings: React.FC<Props> = ({ user }) => {
             )}
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            {permissionState === 'granted' && 'Trình duyệt đã sẵn sàng nhận thông báo push.'}
+            {permissionState === 'granted' && 'ứng dụng đã sẵn sàng nhận thông báo push.'}
             {permissionState === 'default' && 'Chưa cấp quyền. Hãy bấm "Đăng ký lại thông báo" bên dưới.'}
-            {permissionState === 'denied' && 'Trình duyệt đang chặn thông báo. Vui lòng mở cài đặt trình duyệt để bỏ chặn.'}
+            {permissionState === 'denied' && 'ứng dụng đang chặn thông báo. Vui lòng mở cài đặt ứng dụng để bỏ chặn.'}
           </p>
         </div>
 

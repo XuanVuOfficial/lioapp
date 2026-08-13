@@ -41,11 +41,18 @@ export const registerNotifications = async (email: string, forceRegister: boolea
   }
 
   try {
-    // 1. Request notification permission
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('Notification permission was not granted:', permission);
-      return;
+    // 1. Check notification permission state
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+      // Do NOT trigger browser native popup automatically on app load unless user clicked action button (forceRegister = true)
+      if (!forceRegister) {
+        console.log('[FCM] Notification permission not granted. Waiting for user soft prompt action.');
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.log('Notification permission was not granted:', permission);
+        return;
+      }
     }
 
     if (!messaging) {

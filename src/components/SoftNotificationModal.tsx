@@ -19,10 +19,9 @@ export const SoftNotificationModal: React.FC<Props> = ({ user }) => {
     // Show soft prompt if permission is 'default' and not dismissed
     const isDismissed = localStorage.getItem('soft_notif_dismissed') === 'true';
     if (Notification.permission === 'default' && !isDismissed) {
-      // Delay 1.5 seconds after app load for smooth UX
       const timer = setTimeout(() => {
         setIsOpen(true);
-      }, 1500);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [user]);
