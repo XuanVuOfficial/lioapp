@@ -651,37 +651,29 @@ async function checkAndRevokeOverdueLeads() {
 
         console.log(`[Auto-Revoke Cron] Revoked lead ${lead.id} (${customerName}) from ${revokedEmail} due to 10-minute timeout.`);
 
-        // Send Zalo Webhook Notification to revoked staff
-        try {
-          const zaloRevokeMsg = `[HKTT CRM] Khách hàng ${customerName}${phone ? ' (' + phone + ')' : ''} đã bị thu hồi do quá 10 phút không cập nhật thông tin.`;
-          await sendZaloWebhookNotification(revokedEmail, zaloRevokeMsg);
-        } catch (zErr) {
-          console.error('[Auto-Revoke Cron] Error sending Zalo webhook notification:', zErr);
-        }
-
-        // Send FCM Push Notifications
+        // Send FCM Push Notifications (no Zalo on revoke - only on assignment)
         try {
           const messagingAdmin = getFirebaseAdminMessaging();
           if (messagingAdmin) {
             const tokens = await loadFcmTokens();
 
-            // 1. Send push to revoked staff
+            // 1. Send push to revoked staff (no SĐT)
             const revokedTokens = tokens.filter(t => t.email.toLowerCase() === revokedEmail.toLowerCase());
             for (const tItem of revokedTokens) {
               messagingAdmin.send({
                 token: tItem.token,
                 notification: {
                   title: 'Thu hồi khách hàng ⚠️',
-                  body: `Bạn đã bị thu hồi khách hàng ${customerName} (${phone}) do quá 10 phút không cập nhật thông tin.`
+                  body: `Khách hàng ${customerName} đã bị thu hồi do quá 10 phút không cập nhật thông tin.`
                 },
                 data: {
                   title: 'Thu hồi khách hàng ⚠️',
-                  body: `Bạn đã bị thu hồi khách hàng ${customerName} (${phone}) do quá 10 phút không cập nhật thông tin.`
+                  body: `Khách hàng ${customerName} đã bị thu hồi do quá 10 phút không cập nhật thông tin.`
                 }
               }).catch(() => {});
             }
 
-            // 2. Send push to assigner to reassign
+            // 2. Send push to assigner to reassign (keep SĐT for assigner)
             if (assignerEmail && assignerEmail.toLowerCase() !== revokedEmail.toLowerCase()) {
               const assignerTokens = tokens.filter(t => t.email.toLowerCase() === assignerEmail.toLowerCase());
               for (const aItem of assignerTokens) {

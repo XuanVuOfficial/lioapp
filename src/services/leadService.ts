@@ -51,20 +51,20 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
   const vals = Object.values(data).map(v => escapeSQL(v)).join(', ');
   await executeMutation('leads', 'CREATE', newLead, `INSERT INTO leads (${cols}) VALUES (${vals})`);
 
-  // Send push & Zalo notification to assigned employee
+  // Fire-and-forget: send push & Zalo notification to assigned employee (don't block UI)
   if (newLead.assignedToEmail) {
-    try {
-      const { sendPushNotification } = await import('./notificationService');
-      await sendPushNotification(
-        newLead.assignedToEmail,
-        'Khách hàng mới được giao 💼',
-        `Bạn vừa được giao khách hàng ${newLead.customerName} bởi ${newLead.creatorEmail}`
-      );
-      const zaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${newLead.customerName}${newLead.phone ? ' - SĐT: ' + newLead.phone : ''}`;
-      await sendZaloNotification(newLead.assignedToEmail, zaloMsg);
-    } catch (err) {
-      console.error('Error sending notification for new lead:', err);
-    }
+    const _assignedTo = newLead.assignedToEmail;
+    const _name = newLead.customerName;
+    const _creator = newLead.creatorEmail;
+    Promise.resolve().then(async () => {
+      try {
+        const { sendPushNotification } = await import('./notificationService');
+        sendPushNotification(_assignedTo, 'Khách hàng mới được giao 💼', `Bạn vừa được giao khách hàng ${_name} bởi ${_creator}`).catch(() => {});
+        sendZaloNotification(_assignedTo, `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${_name}`).catch(() => {});
+      } catch (err) {
+        console.error('Error sending notification for new lead:', err);
+      }
+    });
   }
 };
 
@@ -112,18 +112,19 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
 
-  // Notify assigned salesperson of the lead update if updated by someone else
+  // Fire-and-forget: notify assigned salesperson of the lead update if updated by someone else
   if (assignedEmail && assignedEmail !== userEmail) {
-    try {
-      const { sendPushNotification } = await import('./notificationService');
-      await sendPushNotification(
-        assignedEmail,
-        'Cập nhật thông tin khách hàng ✍️',
-        `Khách hàng ${customerName || 'của bạn'} vừa được cập nhật bởi ${userEmail}`
-      );
-    } catch (err) {
-      console.error('Error sending push notification on updateLead:', err);
-    }
+    const _email = assignedEmail;
+    const _name = customerName;
+    const _by = userEmail;
+    Promise.resolve().then(async () => {
+      try {
+        const { sendPushNotification } = await import('./notificationService');
+        sendPushNotification(_email, 'Cập nhật thông tin khách hàng ✍️', `Khách hàng ${_name || 'của bạn'} vừa được cập nhật bởi ${_by}`).catch(() => {});
+      } catch (err) {
+        console.error('Error sending push notification on updateLead:', err);
+      }
+    });
   }
 };
 
@@ -172,31 +173,29 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
 
-  // 1. Zalo Notification on Revoke/Reassignment
-  if (prevAssignedToEmail && prevAssignedToEmail.toLowerCase() !== (assignedToEmail || '').toLowerCase()) {
-    try {
-      const revokeZaloMsg = `[HKTT CRM] Khách hàng ${customerName}${phone ? ' (' + phone + ')' : ''} đã bị thu hồi khỏi danh sách quản lý của bạn.`;
-      await sendZaloNotification(prevAssignedToEmail, revokeZaloMsg);
-    } catch (err) {
-      console.error('Error sending Zalo revoke notification:', err);
-    }
-  }
-
-  // 2. Push & Zalo Notification on Assign
-  if (assignedToEmail && assignedToEmail.toLowerCase() !== prevAssignedToEmail.toLowerCase()) {
+  // Fire-and-forget: all notifications run in background so modal closes immediately
+  const _prevEmail = prevAssignedToEmail;
+  const _newEmail = assignedToEmail;
+  const _custName = customerName;
+  const _byEmail = userEmail;
+  Promise.resolve().then(async () => {
     try {
       const { sendPushNotification } = await import('./notificationService');
-      await sendPushNotification(
-        assignedToEmail,
-        'Khách hàng mới được giao 💼',
-        `Bạn vừa được giao khách hàng ${customerName} bởi ${userEmail}`
-      );
-      const assignZaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${customerName}${phone ? ' - SĐT: ' + phone : ''}`;
-      await sendZaloNotification(assignedToEmail, assignZaloMsg);
+
+      // 1. Push notification to revoked staff (no Zalo on revoke, no SĐT)
+      if (_prevEmail && _prevEmail.toLowerCase() !== (_newEmail || '').toLowerCase()) {
+        sendPushNotification(_prevEmail, 'Thu hồi khách hàng ⚠️', `Khách hàng ${_custName} đã bị thu hồi khỏi danh sách quản lý của bạn.`).catch(() => {});
+      }
+
+      // 2. Push & Zalo notification to newly assigned staff (no SĐT)
+      if (_newEmail && _newEmail.toLowerCase() !== _prevEmail.toLowerCase()) {
+        sendPushNotification(_newEmail, 'Khách hàng mới được giao 💼', `Bạn vừa được giao khách hàng ${_custName} bởi ${_byEmail}`).catch(() => {});
+        sendZaloNotification(_newEmail, `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${_custName}`).catch(() => {});
+      }
     } catch (err) {
-      console.error('Error sending notification on assignLead:', err);
+      console.error('Error sending notifications on assignLead:', err);
     }
-  }
+  });
 };
 
 export const deleteLead = async (lead: Lead): Promise<void> => {
