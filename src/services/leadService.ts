@@ -29,6 +29,25 @@ export const sendZaloNotification = async (email: string, message: string) => {
 export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
   const id = generateId();
   const now = new Date().toISOString();
+  const timestamp = new Date(now).toLocaleString('vi-VN');
+
+  let assigneeText = 'Chưa phân công';
+  if (lead.assignedToEmail) {
+    let displayName = lead.assignedToEmail;
+    try {
+      const uData = await queryDB(`SELECT displayName FROM users WHERE email = ${escapeSQL(lead.assignedToEmail)} LIMIT 1`);
+      if (uData && uData.length > 0 && uData[0].displayName) {
+        displayName = uData[0].displayName;
+      }
+    } catch (e) {}
+    assigneeText = `${displayName} (${lead.assignedToEmail})`;
+  }
+
+  const initialHistory = [
+    `[LOG][${timestamp}] Người phụ trách: ${assigneeText}`,
+    ...(lead.history || [])
+  ];
+
   const newLead: Lead = {
     ...lead,
     id,
@@ -37,10 +56,7 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
     assignedByEmail: lead.assignedToEmail ? lead.creatorEmail : undefined,
     assignedAt: lead.assignedToEmail ? now : undefined,
     isUpdatedByAssignee: false,
-    history: [
-      `[LOG][${new Date(now).toLocaleString('vi-VN')}] ${lead.creatorEmail}: Tạo mới khách hàng`,
-      ...(lead.history || [])
-    ]
+    history: initialHistory
   };
 
   const data = Object.fromEntries(
@@ -131,10 +147,18 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   }
 
   const timestamp = new Date(now).toLocaleString('vi-VN');
-  let actionText = `Giao khách hàng`;
-  if (assignedToEmail) actionText += ` cho ${assignedToEmail}`;
-  if (departmentId) actionText += ` cho phòng ban ID ${departmentId}`;
-  const historyEntry = `[LOG][${timestamp}] ${userEmail}: ${actionText}`;
+  let assigneeText = 'Chưa phân công';
+  if (assignedToEmail) {
+    let displayName = assignedToEmail;
+    try {
+      const uData = await queryDB(`SELECT displayName FROM users WHERE email = ${escapeSQL(assignedToEmail)} LIMIT 1`);
+      if (uData && uData.length > 0 && uData[0].displayName) {
+        displayName = uData[0].displayName;
+      }
+    } catch (e) {}
+    assigneeText = `${displayName} (${assignedToEmail})`;
+  }
+  const historyEntry = `[LOG][${timestamp}] Người phụ trách: ${assigneeText}`;
 
   if (!Array.isArray(currentHistory)) currentHistory = [];
   const newHistory = [...currentHistory, historyEntry];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Edit3, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, CheckCircle2, ChevronRight, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Edit3, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, CheckCircle2, ChevronRight, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2, Info } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
 import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadStats, fetchPaginatedLeads, LeadStatsSummary, subscribeToLeadChanges } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
@@ -77,6 +77,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   // Status Update Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [statusForm, setStatusForm] = useState({
     status: '',
     subStatus: '',
@@ -1512,194 +1513,178 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               </button>
             </div>
 
-            <div className="p-3.5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              <div className="md:col-span-2 space-y-4 md:space-y-6">
-                <section>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Thông tin liên hệ</h4>
-                  <div className="bg-slate-50 p-4 rounded-xl space-y-4 mb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-slate-500 mb-0.5">Số điện thoại</p>
-                        <p className="text-lg font-bold text-slate-900 tracking-tight">{selectedLead.phone}</p>
-                      </div>
-                      <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center">
-                        <Phone className="w-5 h-5 text-emerald-600" />
-                      </div>
+            <div className="p-3.5 md:p-6 space-y-4 md:space-y-6">
+              <section>
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Thông tin liên hệ</h4>
+                <div className="bg-slate-50 p-4 rounded-xl space-y-4 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Số điện thoại</p>
+                      <p className="text-lg font-bold text-slate-900 tracking-tight">{selectedLead.phone}</p>
                     </div>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      <a 
-                        href={`tel:${selectedLead.phone}`} 
-                        className="flex flex-col items-center justify-center gap-1.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
-                      >
-                        <PhoneCall className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase">Gọi điện</span>
-                      </a>
-                      <a 
-                        href={`https://zalo.me/${selectedLead.phone}`} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="flex flex-col items-center justify-center gap-1.5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm shadow-blue-100"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase">Zalo</span>
-                      </a>
-                      <a 
-                        href={`sms:${selectedLead.phone}`} 
-                        className="flex flex-col items-center justify-center gap-1.5 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all shadow-sm shadow-slate-200"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase">SMS</span>
-                      </a>
+                    <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center">
+                      <Phone className="w-5 h-5 text-emerald-600" />
                     </div>
                   </div>
-                </section>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <a 
+                      href={`tel:${selectedLead.phone}`} 
+                      className="flex flex-col items-center justify-center gap-1.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
+                    >
+                      <PhoneCall className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase">Gọi điện</span>
+                    </a>
+                    <a 
+                      href={`https://zalo.me/${selectedLead.phone}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="flex flex-col items-center justify-center gap-1.5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm shadow-blue-100"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase">Zalo</span>
+                    </a>
+                    <a 
+                      href={`sms:${selectedLead.phone}`} 
+                      className="flex flex-col items-center justify-center gap-1.5 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all shadow-sm shadow-slate-200"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase">SMS</span>
+                    </a>
+                  </div>
+                </div>
+              </section>
 
-                {/* 30-Minute Lead Update Countdown Banner */}
-                {(() => {
-                  if (!selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee || !selectedLead.assignedAt) return null;
-                  const assignedTime = new Date(selectedLead.assignedAt).getTime();
-                  if (isNaN(assignedTime)) return null;
+              {/* 30-Minute Lead Update Countdown Banner */}
+              {(() => {
+                if (!selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee || !selectedLead.assignedAt) return null;
+                const assignedTime = new Date(selectedLead.assignedAt).getTime();
+                if (isNaN(assignedTime)) return null;
 
-                  const elapsedSec = Math.floor((Date.now() - assignedTime) / 1000);
-                  const remainingSec = Math.max(0, 30 * 60 - elapsedSec);
-                  const mins = Math.floor(remainingSec / 60);
-                  const secs = remainingSec % 60;
-                  const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                  const isDanger = remainingSec <= 300;
+                const elapsedSec = Math.floor((Date.now() - assignedTime) / 1000);
+                const remainingSec = Math.max(0, 30 * 60 - elapsedSec);
+                const mins = Math.floor(remainingSec / 60);
+                const secs = remainingSec % 60;
+                const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                const isDanger = remainingSec <= 300;
 
-                  return (
-                    <div className={`p-4 rounded-2xl border flex items-center justify-between mb-6 ${
-                      isDanger ? 'bg-rose-50 border-rose-200 text-rose-900 animate-pulse' : 'bg-amber-50 border-amber-200 text-amber-900'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <Clock className={`w-5 h-5 ${isDanger ? 'text-rose-600' : 'text-amber-600'}`} />
-                        <div>
-                          <p className="font-bold text-sm">Hạn cập nhật thông tin khách hàng</p>
-                        </div>
+                return (
+                  <div className={`p-4 rounded-2xl border flex items-center justify-between mb-6 ${
+                    isDanger ? 'bg-rose-50 border-rose-200 text-rose-900 animate-pulse' : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <Clock className={`w-5 h-5 ${isDanger ? 'text-rose-600' : 'text-amber-600'}`} />
+                      <div>
+                        <p className="font-bold text-sm">Hạn cập nhật thông tin khách hàng</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
-                        isDanger ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
-                      }`}>
-                        {formatted}
-                      </span>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                      isDanger ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
+                    }`}>
+                      {formatted}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cập nhật thông tin</h4>
+                </div>
+                {(() => {
+                  const currentChainParts: string[] = [];
+                  if (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
+                    currentChainParts.push(selectedLead.status);
+                    if (selectedLead.subStatus) currentChainParts.push(selectedLead.subStatus);
+                    if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
+                    if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
+                  } else if (selectedLead.subStatus) {
+                    currentChainParts.push(selectedLead.status || 'Chưa liên hệ');
+                    currentChainParts.push(selectedLead.subStatus);
+                    if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
+                    if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
+                  }
+
+                  const hasCustomStatus = currentChainParts.length > 0;
+                  const updateCount = getStatusUpdateCount(selectedLead.history);
+                  const nextUpdateNumber = updateCount + 1;
+
+                  // 1. Nếu chưa từng cập nhật hoặc trạng thái 'Chưa liên hệ'
+                  if (!hasCustomStatus || selectedLead.status === 'Chưa liên hệ') {
+                    return (
+                      <button
+                        type="button"
+                        onClick={handleOpenStatusModal}
+                        className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 group mb-4 cursor-pointer"
+                      >
+                        <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                        <span>Cập nhật thông tin {updateCount > 0 ? `(Lần ${nextUpdateNumber})` : ''}</span>
+                      </button>
+                    );
+                  }
+
+                  // 2. Nếu trạng thái là 'Không liên hệ được' -> Hiện button Cập nhật trạng thái lần X
+                  if (selectedLead.status === 'Không liên hệ được') {
+                    return (
+                      <button
+                        type="button"
+                        onClick={handleOpenStatusModal}
+                        className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 group mb-4 cursor-pointer"
+                      >
+                        <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                        <span>Cập nhật trạng thái lần {nextUpdateNumber}</span>
+                        {selectedLead.subStatus && (
+                          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-md font-medium">
+                            (Hiện tại: {selectedLead.subStatus})
+                          </span>
+                        )}
+                      </button>
+                    );
+                  }
+
+                  // 3. Nếu trạng thái 'Đã liên hệ' (hoặc đã có các bước chi tiết) -> Thẻ nhỏ gọn trên 1 dòng
+                  return (
+                    <div 
+                      onClick={handleOpenStatusModal}
+                      className="w-full px-3 py-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group mb-4 flex items-center justify-between gap-2 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-1 min-w-0 overflow-x-auto scrollbar-hide py-0.5">
+                        {currentChainParts.map((part, idx) => (
+                          <React.Fragment key={idx}>
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0 whitespace-nowrap ${
+                              idx === 0 
+                                ? 'bg-emerald-600 text-white shadow-2xs' 
+                                : idx === 1 
+                                ? 'bg-blue-600 text-white shadow-2xs' 
+                                : idx === 2 
+                                ? 'bg-indigo-600 text-white shadow-2xs' 
+                                : 'bg-purple-600 text-white shadow-2xs'
+                            }`}>
+                              {part}
+                            </span>
+                            {idx < currentChainParts.length - 1 && (
+                              <span className="text-slate-300 font-bold text-[10px] shrink-0">›</span>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 shrink-0 group-hover:underline pl-1 border-l border-slate-200">
+                        <Edit3 className="w-3 h-3" />
+                        <span>Thay đổi</span>
+                      </div>
                     </div>
                   );
                 })()}
-
-                <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cập nhật thông tin</h4>
-                  </div>
-                  {(() => {
-                    const currentChainParts: string[] = [];
-                    if (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
-                      currentChainParts.push(selectedLead.status);
-                      if (selectedLead.subStatus) currentChainParts.push(selectedLead.subStatus);
-                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
-                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
-                    } else if (selectedLead.subStatus) {
-                      currentChainParts.push(selectedLead.status || 'Chưa liên hệ');
-                      currentChainParts.push(selectedLead.subStatus);
-                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
-                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
-                    }
-
-                    const hasCustomStatus = currentChainParts.length > 0;
-                    const updateCount = getStatusUpdateCount(selectedLead.history);
-                    const nextUpdateNumber = updateCount + 1;
-
-                    // 1. Nếu chưa từng cập nhật hoặc trạng thái 'Chưa liên hệ'
-                    if (!hasCustomStatus || selectedLead.status === 'Chưa liên hệ') {
-                      return (
-                        <button
-                          type="button"
-                          onClick={handleOpenStatusModal}
-                          className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 group mb-4 cursor-pointer"
-                        >
-                          <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                          <span>Cập nhật thông tin {updateCount > 0 ? `(Lần ${nextUpdateNumber})` : ''}</span>
-                        </button>
-                      );
-                    }
-
-                    // 2. Nếu trạng thái là 'Không liên hệ được' -> Hiện button Cập nhật trạng thái lần X
-                    if (selectedLead.status === 'Không liên hệ được') {
-                      return (
-                        <button
-                          type="button"
-                          onClick={handleOpenStatusModal}
-                          className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 group mb-4 cursor-pointer"
-                        >
-                          <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                          <span>Cập nhật trạng thái lần {nextUpdateNumber}</span>
-                          {selectedLead.subStatus && (
-                            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-md font-medium">
-                              (Hiện tại: {selectedLead.subStatus})
-                            </span>
-                          )}
-                        </button>
-                      );
-                    }
-
-                    // 3. Nếu trạng thái 'Đã liên hệ' (hoặc đã có các bước chi tiết) -> Thẻ nhỏ gọn trên 1 dòng
-                    return (
-                      <div 
-                        onClick={handleOpenStatusModal}
-                        className="w-full px-3 py-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group mb-4 flex items-center justify-between gap-2 shadow-2xs"
-                      >
-                        <div className="flex items-center gap-1 min-w-0 overflow-x-auto scrollbar-hide py-0.5">
-                          {currentChainParts.map((part, idx) => (
-                            <React.Fragment key={idx}>
-                              <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0 whitespace-nowrap ${
-                                idx === 0 
-                                  ? 'bg-emerald-600 text-white shadow-2xs' 
-                                  : idx === 1 
-                                  ? 'bg-blue-600 text-white shadow-2xs' 
-                                  : idx === 2 
-                                  ? 'bg-indigo-600 text-white shadow-2xs' 
-                                  : 'bg-purple-600 text-white shadow-2xs'
-                              }`}>
-                                {part}
-                              </span>
-                              {idx < currentChainParts.length - 1 && (
-                                <span className="text-slate-300 font-bold text-[10px] shrink-0">›</span>
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 shrink-0 group-hover:underline pl-1 border-l border-slate-200">
-                          <Edit3 className="w-3 h-3" />
-                          <span>Thay đổi</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-2">Thêm ghi chú mới (Timeline)</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text"
-                          value={newNote}
-                          onChange={e => setNewNote(e.target.value)}
-                          onKeyPress={async (e) => {
-                            if (e.key === 'Enter' && newNote.trim()) {
-                              const timestamp = new Date().toLocaleString('vi-VN');
-                              const username = user.displayName || user.email;
-                              const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
-                              const updatedHistory = [...(selectedLead.history || []), entry];
-                              await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
-                              setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
-                              setNewNote('');
-                            }
-                          }}
-                          placeholder="Nhập nội dung trao đổi..."
-                          className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
-                        />
-                        <button 
-                          onClick={async () => {
-                            if (!newNote.trim()) return;
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-2">Thêm ghi chú mới (Timeline)</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={newNote}
+                        onChange={e => setNewNote(e.target.value)}
+                        onKeyPress={async (e) => {
+                          if (e.key === 'Enter' && newNote.trim()) {
                             const timestamp = new Date().toLocaleString('vi-VN');
                             const username = user.displayName || user.email;
                             const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
@@ -1707,110 +1692,99 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
                             setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
                             setNewNote('');
-                          }}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-all"
-                        >
-                          Gửi
-                        </button>
-                      </div>
+                          }
+                        }}
+                        placeholder="Nhập nội dung trao đổi..."
+                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                      />
+                      <button 
+                        onClick={async () => {
+                          if (!newNote.trim()) return;
+                          const timestamp = new Date().toLocaleString('vi-VN');
+                          const username = user.displayName || user.email;
+                          const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
+                          const updatedHistory = [...(selectedLead.history || []), entry];
+                          await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
+                          setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
+                          setNewNote('');
+                        }}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-all"
+                      >
+                        Gửi
+                      </button>
                     </div>
                   </div>
-                </section>
+                </div>
+              </section>
 
-                <section>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                     <History className="w-4 h-4" /> Lịch sử trao đổi
                   </h4>
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                    {(selectedLead.history || []).slice().reverse().map((entry, i) => {
-                      const isNote = entry.startsWith('[NOTE]');
-                      const isLog = entry.startsWith('[LOG]');
-                      const cleanEntry = entry.replace(/^\[(NOTE|LOG)\]/, '');
-                      
-                      const parts = cleanEntry.match(/^\[(.*?)\] (.*?): (.*)$/);
-                      if (parts) {
-                        return (
-                          <div key={i} className={`p-3 rounded-xl border ${isNote ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
-                            <div className="flex justify-between items-start mb-1">
-                              <div className="flex items-center gap-1.5">
-                                {isNote ? (
-                                  <Edit2 className="w-3 h-3 text-amber-600" />
-                                ) : (
-                                  <History className="w-3 h-3 text-emerald-600" />
-                                )}
-                                <span className={`text-[10px] font-bold uppercase tracking-wider ${isNote ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                  {parts[2]}
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-slate-400">{parts[1]}</span>
-                            </div>
-                            <p className="text-sm text-slate-700 leading-relaxed italic">{isNote ? parts[3] : parts[3]}</p>
-                          </div>
-                        );
-                      }
+                  <button
+                    type="button"
+                    onClick={() => setShowInfoModal(true)}
+                    title="Xem thông tin hệ thống & Người phụ trách"
+                    className="p-1 rounded-full text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                  {(selectedLead.history || []).slice().reverse().map((entry, i) => {
+                    const isNote = entry.startsWith('[NOTE]');
+                    const isLog = entry.startsWith('[LOG]');
+                    const cleanEntry = entry.replace(/^\[(NOTE|LOG)\]/, '');
+                    
+                    const parts = cleanEntry.match(/^\[(.*?)\] (.*?): (.*)$/);
+                    if (parts) {
                       return (
-                        <div key={i} className="flex gap-3 text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
-                          <History className="w-4 h-4 text-slate-400 shrink-0" />
-                          <p className="text-slate-600">{entry}</p>
+                        <div key={i} className={`p-3 rounded-xl border ${isNote ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex justify-between items-start mb-1">
+                            <div className="flex items-center gap-1.5">
+                              {isNote ? (
+                                <Edit2 className="w-3 h-3 text-amber-600" />
+                              ) : (
+                                <History className="w-3 h-3 text-emerald-600" />
+                              )}
+                              <span className={`text-[10px] font-bold uppercase tracking-wider ${isNote ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {parts[2]}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400">{parts[1]}</span>
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed italic">{isNote ? parts[3] : parts[3]}</p>
                         </div>
                       );
-                    })}
-                  </div>
-                </section>
+                    }
+                    return (
+                      <div key={i} className="flex gap-3 text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <History className="w-4 h-4 text-slate-400 shrink-0" />
+                        <p className="text-slate-600">{entry}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
 
-                {selectedLead.notes && (
-                  <section>
-                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Ghi chú ban đầu</h4>
-                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLead.notes}</p>
-                    </div>
-                  </section>
-                )}
-              </div>
-
-              <div className="space-y-6">
+              {selectedLead.notes && (
                 <section>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Trạng thái & Giao việc</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs text-slate-500 mb-2">Người tạo và thời gian tạo</p>
-                      <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
-                        <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
-                          {selectedLead.creatorEmail ? selectedLead.creatorEmail[0].toUpperCase() : '?'}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">
-                            {selectedLead.creatorEmail}
-                          </p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {new Date(selectedLead.createdAt).toLocaleString('vi-VN')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 mb-2">Được giao cho</p>
-                      <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
-                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-xs font-bold text-emerald-700">
-                          {selectedLead.assignedToEmail ? selectedLead.assignedToEmail[0].toUpperCase() : '?'}
-                        </div>
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {selectedLead.assignedToEmail || 'Chưa giao'}
-                        </p>
-                      </div>
-                    </div>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Ghi chú ban đầu</h4>
+                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLead.notes}</p>
                   </div>
                 </section>
+              )}
 
-                {selectedLead.imageUrl && (
-                  <section>
-                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Tệp đính kèm</h4>
-                    <div className="rounded-xl overflow-hidden border border-slate-200">
-                      <img src={selectedLead.imageUrl} alt="Tệp đính kèm khách hàng" className="w-full h-auto" />
-                    </div>
-                  </section>
-                )}
-              </div>
+              {selectedLead.imageUrl && (
+                <section>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Tệp đính kèm</h4>
+                  <div className="rounded-xl overflow-hidden border border-slate-200">
+                    <img src={selectedLead.imageUrl} alt="Tệp đính kèm khách hàng" className="w-full h-auto" />
+                  </div>
+                </section>
+              )}
             </div>
           </div>
         </div>
@@ -2014,6 +1988,107 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     <span>Xác nhận & Lưu</span>
                   </>
                 )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* System Info / Assignment Modal */}
+      {showInfoModal && selectedLead && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4"
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <Info className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Thông tin hệ thống & Giao việc</h3>
+                  <p className="text-xs text-slate-500 font-medium">{selectedLead.customerName} • {selectedLead.phone}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body Content */}
+            <div className="space-y-3.5 py-1">
+              {/* Người tạo và thời gian tạo */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Người tạo & Thời gian tạo</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                    {selectedLead.creatorEmail ? selectedLead.creatorEmail[0].toUpperCase() : '?'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {staff.find(s => s.email.toLowerCase() === selectedLead.creatorEmail?.toLowerCase())?.displayName || selectedLead.creatorEmail}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {selectedLead.creatorEmail} • {new Date(selectedLead.createdAt).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Người phụ trách hiện tại */}
+              <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-2">Người phụ trách (hiện tại)</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-emerald-200 rounded-full flex items-center justify-center text-xs font-bold text-emerald-800 shrink-0">
+                    {selectedLead.assignedToEmail ? selectedLead.assignedToEmail[0].toUpperCase() : '?'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">
+                      {selectedLead.assignedToEmail 
+                        ? (staff.find(s => s.email.toLowerCase() === selectedLead.assignedToEmail?.toLowerCase())?.displayName || selectedLead.assignedToEmail)
+                        : 'Chưa phân công'}
+                    </p>
+                    <p className="text-xs text-slate-600 truncate">
+                      {selectedLead.assignedToEmail 
+                        ? `${selectedLead.assignedToEmail}${selectedLead.assignedAt ? ` • Giao lúc: ${new Date(selectedLead.assignedAt).toLocaleString('vi-VN')}` : ''}`
+                        : 'Chưa phân công cho nhân viên nào'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Thông tin phụ: Dự án & Phòng ban */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dự án quan tâm</p>
+                  <p className="text-xs font-semibold text-slate-800 truncate">
+                    {projects.find(p => p.id === selectedLead.projectId)?.name || 'Chưa gắn dự án'}
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phòng ban</p>
+                  <p className="text-xs font-semibold text-slate-800 truncate">
+                    {departments.find(d => d.id === selectedLead.departmentId)?.name || 'Chưa có phòng ban'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowInfoModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </motion.div>
