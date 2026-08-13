@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Project, UserProfile, Lead } from '../types';
+import { LeadStatsSummary } from '../services/leadService';
 import { queryDB, escapeSQL, subscribeDB, generateId, executeMutation, subscribeToMutations } from '../api';
 import { Plus, Trash2, FolderKanban, Users, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ProjectListProps {
   user: UserProfile;
   leads: Lead[];
+  statsSummary?: LeadStatsSummary | null;
   onProjectClick?: (projectId: string) => void;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProjectClick }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSummary, onProjectClick }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -66,8 +68,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
     setIsAdding(false);
   };
 
-  const handleDeleteProject = async (project: Project) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa dự án này?')) return;
+  const handleDeleteProject = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa dự án "${project.name}"?`)) return;
     await executeMutation('projects', 'DELETE', project, `DELETE FROM projects WHERE id = ${escapeSQL(project.id)} LIMIT 1`);
   };
 
@@ -81,58 +84,62 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-          <FolderKanban className="w-6 h-6 text-emerald-600" />
-          Quản lý Dự án
-        </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Quản lý Dự án</h1>
+          <p className="text-slate-500 text-sm mt-1">Danh sách các dự án bất động sản và phân bổ khách hàng.</p>
+        </div>
         {(user.role === 'tgd' || user.role === 'admin' || user.role === 'tp') && (
           <button
             onClick={() => setIsAdding(!isAdding)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
           >
-            <Plus className="w-4 h-4" />
-            Thêm Dự án
+            <Plus className="w-5 h-5" />
+            <span>Thêm Dự án mới</span>
           </button>
         )}
       </div>
 
       {isAdding && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-top-4 duration-200">
-          <form onSubmit={handleAddProject} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tên dự án</label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                placeholder="VD: The Prive"
-                required
-              />
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-4 duration-200">
+          <h3 className="font-bold text-slate-900 mb-4">Tạo Dự án Mới</h3>
+          <form onSubmit={handleAddProject} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Tên dự án *</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Vinhomes Grand Park"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Tiền tố mã khách hàng (Viết tắt) *</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: vgp"
+                  value={newAbbreviation}
+                  onChange={(e) => setNewAbbreviation(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono lowercase"
+                  required
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Mã khách hàng tự động sinh ra sẽ bắt đầu bằng tiền tố này (ví dụ: vgp001, vgp002...)</p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tên viết tắt</label>
-              <input
-                type="text"
-                value={newAbbreviation}
-                onChange={(e) => setNewAbbreviation(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                placeholder="VD: tp"
-                required
-              />
-            </div>
-            <div className="md:col-span-2 flex justify-end gap-3 mt-2">
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition-colors shadow-sm"
+                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
               >
                 Lưu Dự án
               </button>
@@ -144,6 +151,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, onProject
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {projects.map((project) => {
           const projectLeads = leads.filter(l => l.projectId === project.id);
+          const totalProjectLeads = statsSummary ? (statsSummary.projectCounts[project.id] || 0) : projectLeads.length;
           const contactedLeads = projectLeads.filter(l => l.status === 'Đã liên hệ').length;
           const closedLeads = projectLeads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length;
 

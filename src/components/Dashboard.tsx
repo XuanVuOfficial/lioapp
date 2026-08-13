@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Users, UserPlus, TrendingUp, CheckCircle, Clock, AlertCircle, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react';
 import { Lead, Department, UserProfile } from '../types';
+import { LeadStatsSummary } from '../services/leadService';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line 
@@ -11,44 +12,71 @@ interface Props {
   leads: Lead[];
   departments: Department[];
   user: UserProfile;
+  statsSummary?: LeadStatsSummary | null;
 }
 
 const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
-  const stats = [
-    { label: 'Tổng số khách hàng', value: leads.length, icon: UserPlus, color: 'bg-blue-50 text-blue-600' },
-    { label: 'Đã liên hệ', value: leads.filter(l => l.status === 'Đã liên hệ').length, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Đã booking/cọc', value: leads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length, icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
-    { label: 'Chưa liên hệ', value: leads.filter(l => l.status === 'Chưa liên hệ').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
-  ];
+export const Dashboard: React.FC<Props> = ({ leads, departments, user, statsSummary }) => {
+  const stats = useMemo(() => {
+    if (statsSummary) {
+      return [
+        { label: 'Tổng số khách hàng', value: statsSummary.total, icon: UserPlus, color: 'bg-blue-50 text-blue-600' },
+        { label: 'Đã liên hệ', value: statsSummary.statusCounts['Đã liên hệ'] || 0, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
+        { label: 'Đã booking/cọc', value: (statsSummary.resultCounts['Đã booking'] || 0) + (statsSummary.resultCounts['Đã cọc'] || 0), icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
+        { label: 'Chưa liên hệ', value: statsSummary.statusCounts['Chưa liên hệ'] || 0, icon: Clock, color: 'bg-amber-50 text-amber-600' },
+      ];
+    }
+    return [
+      { label: 'Tổng số khách hàng', value: leads.length, icon: UserPlus, color: 'bg-blue-50 text-blue-600' },
+      { label: 'Đã liên hệ', value: leads.filter(l => l.status === 'Đã liên hệ').length, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
+      { label: 'Đã booking/cọc', value: leads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length, icon: CheckCircle, color: 'bg-indigo-50 text-indigo-600' },
+      { label: 'Chưa liên hệ', value: leads.filter(l => l.status === 'Chưa liên hệ').length, icon: Clock, color: 'bg-amber-50 text-amber-600' },
+    ];
+  }, [leads, statsSummary]);
 
-  const recentLeads = [...leads]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 5);
+  const recentLeads = useMemo(() => {
+    return [...leads]
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 5);
+  }, [leads]);
 
   // Data for Bar Chart: Leads by Status
   const leadsByStatusData = useMemo(() => {
+    if (statsSummary) {
+      return Object.entries(statsSummary.statusCounts)
+        .filter(([name]) => name !== 'Tất cả')
+        .map(([name, value]) => ({ name, value }));
+    }
     const statusCounts: Record<string, number> = {};
     leads.forEach(lead => {
       const status = lead.status || 'Khác';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
     return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
-  }, [leads]);
+  }, [leads, statsSummary]);
 
   // Data for Pie Chart: Leads by Department
   const leadsByDeptData = useMemo(() => {
+    if (statsSummary && statsSummary.deptCounts) {
+      return Object.entries(statsSummary.deptCounts).map(([deptId, count]) => {
+        const deptName = departments.find(d => d.id === deptId)?.name || 'Chưa phân bổ';
+        return { name: deptName, value: count };
+      });
+    }
     const deptCounts: Record<string, number> = {};
     leads.forEach(lead => {
       const dept = departments.find(d => d.id === lead.departmentId)?.name || 'Chưa phân bổ';
       deptCounts[dept] = (deptCounts[dept] || 0) + 1;
     });
     return Object.entries(deptCounts).map(([name, value]) => ({ name, value }));
-  }, [leads, departments]);
+  }, [leads, departments, statsSummary]);
 
   // Data for Line Chart: Leads over time (last 7 days)
   const leadsOverTimeData = useMemo(() => {
+    if (statsSummary && statsSummary.dailyCounts) {
+      return statsSummary.dailyCounts;
+    }
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -67,7 +95,7 @@ export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
       date: date.split('-').slice(1).reverse().join('/'),
       count: dateCounts[date] || 0
     }));
-  }, [leads]);
+  }, [leads, statsSummary]);
 
   return (
     <div className="space-y-4 md:space-y-6">

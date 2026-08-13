@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
-import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadsPaginated } from '../services/leadService';
+import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadStats, fetchPaginatedLeads, LeadStatsSummary, subscribeToLeadChanges } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
 import { exportLeadsToExcel } from '../utils/excelExport';
 
@@ -45,17 +45,14 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [showStats, setShowStats] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   
-  // Server-side Pagination & Tab Filtering State
-  const [paginatedLeads, setPaginatedLeads] = useState<Lead[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [isFetchingLeads, setIsFetchingLeads] = useState(false);
-  const [countsByStatus, setCountsByStatus] = useState<Record<string, number>>({
-    'Tất cả': 0,
-    'Chưa liên hệ': 0,
-    'Không liên hệ được': 0,
-    'Đã liên hệ': 0
-  });
+  // Paginated Leads & JSON Stats States
+  const [displayedLeads, setDisplayedLeads] = useState<Lead[]>([]);
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoadingLeads, setIsLoadingLeads] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [statsSummary, setStatsSummary] = useState<LeadStatsSummary | null>(null);
 
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -101,18 +98,12 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   // Sync selectedLead with latest leads data
   useEffect(() => {
     if (selectedLead) {
-      const updatedLead = paginatedLeads.find(l => l.id === selectedLead.id);
+      const updatedLead = displayedLeads.find(l => l.id === selectedLead.id);
       if (updatedLead) {
-        setSelectedLead(prev => prev ? {
-          ...updatedLead,
-          history: (prev.history && prev.history.length > 0) ? prev.history : (updatedLead.history || []),
-          notes: prev.notes || updatedLead.notes || '',
-          details: prev.details || updatedLead.details || '',
-          imageUrl: prev.imageUrl || updatedLead.imageUrl || ''
-        } : null);
+        setSelectedLead(updatedLead);
       }
     }
-  }, [paginatedLeads]);
+  }, [displayedLeads]);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -183,26 +174,203 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     setShowExportModal(true);
   };
 
-  const getLeadsToExport = () => {
-    let list = paginatedLeads;
-    if (exportStartDate) {
-      const start = new Date(exportStartDate + 'T00:00:00');
-      if (!isNaN(start.getTime())) {
-        list = list.filter(l => l.createdAt && new Date(l.createdAt) >= start);
+  const getSubDeptIdsRecursive = React.useCallback((deptId: string): string[] => {
+    const ids = [deptId];
+    departments.filter(d => d.parentId === deptId).forEach(child => {
+      ids.push(...getSubDeptIdsRecursive(child.id));
+    });
+    return ids;
+  }, [departments]);
+
+  const allowedDepartments = React.useMemo(() => {
+    if (['tgd', 'admin'].includes(user.role)) return departments;
+    if (['gds', 'tp'].includes(user.role)) {
+      const baseIds = (user.managedDeptIds && user.managedDeptIds.length > 0) 
+        ? user.managedDeptIds 
+        : (user.departmentId ? [user.departmentId] : []);
+        
+      const getAllSubDeptIds = (deptId: string): string[] => {
+        const ids = [deptId];
+        departments.filter(d => d.parentId === deptId).forEach(child => {
+          ids.push(...getAllSubDeptIds(child.id));
+        });
+        return ids;
+      };
+      
+      const allAllowedIds = new Set<string>();
+      baseIds.forEach(id => {
+        getAllSubDeptIds(id).forEach(subId => allAllowedIds.add(subId));
+      });
+      
+      return departments.filter(d => allAllowedIds.has(d.id));
+    }
+    return departments.filter(d => d.id === user.departmentId);
+  }, [user, departments]);
+
+  useEffect(() => {
+    if (departments.length > 0 && !hasInitializedDept) {
+      if (['tgd', 'admin'].includes(user.role)) {
+        setSelectedDeptId('');
+        setHasInitializedDept(true);
+      } else if (allowedDepartments.length > 0) {
+        const topDept = [...allowedDepartments].sort((a, b) => a.level - b.level)[0];
+        setSelectedDeptId(topDept.id);
+        setHasInitializedDept(true);
       }
     }
-    if (exportEndDate) {
-      const end = new Date(exportEndDate + 'T23:59:59.999');
-      if (!isNaN(end.getTime())) {
-        list = list.filter(l => l.createdAt && new Date(l.createdAt) <= end);
-      }
+  }, [departments, allowedDepartments, user.role, hasInitializedDept]);
+
+  const activeSubDeptIds = React.useMemo(() => {
+    if (selectedDeptId) {
+      return getSubDeptIdsRecursive(selectedDeptId);
     }
-    return list;
+    return allowedDepartments.map(d => d.id);
+  }, [selectedDeptId, allowedDepartments, getSubDeptIdsRecursive]);
+
+  // Fetch initial Page 1 (20 items) and JSON stats
+  const refreshLeadsAndStats = React.useCallback(async () => {
+    setIsLoadingLeads(true);
+    setPage(1);
+    try {
+      const [paginatedRes, statsRes] = await Promise.all([
+        fetchPaginatedLeads({
+          role: user.role,
+          userEmail: user.email,
+          departmentIds: activeSubDeptIds,
+          projectId: selectedProjectId,
+          status: currentTab,
+          assignFilter,
+          searchTerm,
+          page: 1,
+          limit: 20
+        }),
+        fetchLeadStats({
+          role: user.role,
+          userEmail: user.email,
+          departmentIds: activeSubDeptIds,
+          projectId: selectedProjectId,
+          assignFilter,
+          searchTerm
+        })
+      ]);
+
+      setDisplayedLeads(paginatedRes.leads);
+      setHasMore(paginatedRes.hasMore);
+      setTotalCount(paginatedRes.totalCount);
+      setStatsSummary(statsRes);
+    } catch (e) {
+      console.error('Error fetching paginated leads / stats:', e);
+    } finally {
+      setIsLoadingLeads(false);
+    }
+  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm]);
+
+  useEffect(() => {
+    refreshLeadsAndStats();
+  }, [refreshLeadsAndStats]);
+
+  // Realtime subscription ping
+  useEffect(() => {
+    const unsub = subscribeToLeadChanges(user.role, user.email, activeSubDeptIds, () => {
+      refreshLeadsAndStats();
+    });
+    return () => unsub();
+  }, [user.role, user.email, activeSubDeptIds, refreshLeadsAndStats]);
+
+  // Load next 20 items on scroll
+  const loadNextPage = React.useCallback(async () => {
+    if (isLoadingMore || isLoadingLeads || !hasMore) return;
+    setIsLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const res = await fetchPaginatedLeads({
+        role: user.role,
+        userEmail: user.email,
+        departmentIds: activeSubDeptIds,
+        projectId: selectedProjectId,
+        status: currentTab,
+        assignFilter,
+        searchTerm,
+        page: nextPage,
+        limit: 20
+      });
+
+      setDisplayedLeads(prev => {
+        const existingIds = new Set(prev.map(l => l.id));
+        const newUnique = res.leads.filter(l => !existingIds.has(l.id));
+        return [...prev, ...newUnique];
+      });
+      setPage(nextPage);
+      setHasMore(res.hasMore);
+      setTotalCount(res.totalCount);
+    } catch (e) {
+      console.error('Error loading next page of leads:', e);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, isLoadingLeads, hasMore, page, user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm]);
+
+  // Infinite scroll IntersectionObserver
+  useEffect(() => {
+    if (!hasMore) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        loadNextPage();
+      }
+    }, {
+      rootMargin: '200px',
+    });
+
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [hasMore, loadNextPage]);
+
+  // Export excel handler
+  const getLeadsToExport = async (): Promise<Lead[]> => {
+    try {
+      const res = await fetchPaginatedLeads({
+        role: user.role,
+        userEmail: user.email,
+        departmentIds: activeSubDeptIds,
+        projectId: selectedProjectId,
+        status: currentTab,
+        assignFilter,
+        searchTerm,
+        page: 1,
+        limit: 5000
+      });
+      let list = res.leads;
+      if (exportStartDate) {
+        const start = new Date(exportStartDate + 'T00:00:00');
+        if (!isNaN(start.getTime())) {
+          list = list.filter(l => l.createdAt && new Date(l.createdAt) >= start);
+        }
+      }
+      if (exportEndDate) {
+        const end = new Date(exportEndDate + 'T23:59:59.999');
+        if (!isNaN(end.getTime())) {
+          list = list.filter(l => l.createdAt && new Date(l.createdAt) <= end);
+        }
+      }
+      return list;
+    } catch (e) {
+      console.error('Error getting leads to export:', e);
+      return [];
+    }
   };
 
   const handleConfirmExport = async () => {
     try {
-      const leadsToExport = getLeadsToExport();
+      const leadsToExport = await getLeadsToExport();
       if (leadsToExport.length === 0) {
         alert('Không có dữ liệu khách hàng nào trong khoảng thời gian đã chọn.');
         return;
@@ -220,138 +388,29 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     }
   };
 
-  const getSubDeptIdsRecursive = React.useCallback((deptId: string): string[] => {
-    const ids = [deptId];
-    departments.filter(d => d.parentId === deptId).forEach(child => {
-      ids.push(...getSubDeptIdsRecursive(child.id));
-    });
-    return ids;
-  }, [departments]);
-
-  const allowedDepartments = React.useMemo(() => {
-    if (['tgd', 'admin'].includes(user.role)) return departments;
-    if (['gds', 'tp'].includes(user.role)) {
-      if (user.managedDeptIds && user.managedDeptIds.length > 0) {
-        const allManagedIds = new Set<string>();
-        user.managedDeptIds.forEach(id => {
-          getSubDeptIdsRecursive(id).forEach(subId => allManagedIds.add(subId));
-        });
-        return departments.filter(d => allManagedIds.has(d.id));
-      }
-      if (user.departmentId) {
-        const managedIds = getSubDeptIdsRecursive(user.departmentId);
-        return departments.filter(d => managedIds.includes(d.id));
-      }
-      return [];
+  // Statistics Data for showStats
+  const statusData = React.useMemo(() => {
+    if (statsSummary) {
+      return statuses.filter(s => s !== 'Tất cả').map(status => ({
+        name: status,
+        value: statsSummary.statusCounts[status] || 0
+      }));
     }
-    // Staff only sees their own department
-    return departments.filter(d => d.id === user.departmentId);
-  }, [user, departments, getSubDeptIdsRecursive]);
+    return [];
+  }, [statsSummary]);
 
-  useEffect(() => {
-    if (departments.length > 0 && !hasInitializedDept) {
-      if (['tgd', 'admin'].includes(user.role)) {
-        setSelectedDeptId('');
-        setHasInitializedDept(true);
-      } else if (allowedDepartments.length > 0) {
-        // Auto-select the highest level department in allowed list
-        const topDept = [...allowedDepartments].sort((a, b) => a.level - b.level)[0];
-        setSelectedDeptId(topDept.id);
-        setHasInitializedDept(true);
-      }
+  const resultData = React.useMemo(() => {
+    if (statsSummary) {
+      return resultOptions.map(result => ({
+        name: result,
+        value: statsSummary.resultCounts[result] || 0
+      }));
     }
-  }, [departments, allowedDepartments, user.role, hasInitializedDept]);
-
-  // Server-side Paginated Leads Fetcher
-  const loadLeadsPage = React.useCallback(async (targetPage: number, append: boolean = false) => {
-    setIsFetchingLeads(true);
-    try {
-      const allowedDeptIds = allowedDepartments.map(d => d.id);
-      const res = await fetchLeadsPaginated({
-        page: targetPage,
-        limit: 20,
-        status: currentTab,
-        projectId: selectedProjectId,
-        departmentId: selectedDeptId,
-        allowedDeptIds,
-        assignFilter,
-        searchTerm,
-        userEmail: user.email,
-        userRole: user.role
-      });
-
-      if (res && res.success) {
-        if (append) {
-          setPaginatedLeads(prev => {
-            const existingIds = new Set(prev.map(l => l.id));
-            const newItems = res.leads.filter(l => !existingIds.has(l.id));
-            return [...prev, ...newItems];
-          });
-        } else {
-          setPaginatedLeads(res.leads);
-        }
-        setCountsByStatus(res.countsByStatus);
-        setHasMore(res.hasMore);
-        setPage(targetPage);
-      }
-    } catch (e) {
-      console.error('Error loading paginated leads:', e);
-    } finally {
-      setIsFetchingLeads(false);
-    }
-  }, [currentTab, selectedProjectId, selectedDeptId, allowedDepartments, assignFilter, searchTerm, user.email, user.role]);
-
-  // Reset to Page 1 on Filter or Tab change
-  useEffect(() => {
-    loadLeadsPage(1, false);
-  }, [currentTab, selectedProjectId, selectedDeptId, assignFilter, searchTerm, loadLeadsPage]);
-
-  // Load next page on scroll
-  const handleLoadNextPage = React.useCallback(() => {
-    if (hasMore && !isFetchingLeads) {
-      loadLeadsPage(page + 1, true);
-    }
-  }, [hasMore, isFetchingLeads, page, loadLeadsPage]);
-
-  useEffect(() => {
-    if (!hasMore || isFetchingLeads) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        handleLoadNextPage();
-      }
-    }, {
-      rootMargin: '200px',
-    });
-
-    const currentSentinel = sentinelRef.current;
-    if (currentSentinel) {
-      observer.observe(currentSentinel);
-    }
-
-    return () => {
-      if (currentSentinel) {
-        observer.unobserve(currentSentinel);
-      }
-    };
-  }, [hasMore, isFetchingLeads, handleLoadNextPage]);
-
-  const displayedLeads = paginatedLeads;
-
-  // Statistics Data
-  const statsLeads = selectedProjectId ? leads.filter(l => l.projectId === selectedProjectId) : leads;
-  
-  const statusData = statuses.filter(s => s !== 'Tất cả').map(status => ({
-    name: status,
-    value: statsLeads.filter(l => l.status === status).length
-  }));
-
-  const resultData = resultOptions.map(result => ({
-    name: result,
-    value: statsLeads.filter(l => l.resultStatus === result).length
-  }));
+    return [];
+  }, [statsSummary]);
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+
 
   const handleCreate = async () => {
     if (!newLead.customerName || !newLead.phone) {
@@ -642,37 +701,29 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          
-          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Tổng quan dự án</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-slate-50 rounded-xl">
                 <p className="text-xs text-slate-500 mb-1">Tổng khách hàng</p>
-                <p className="text-2xl font-bold text-slate-900">{statsLeads.length}</p>
+                <p className="text-2xl font-bold text-slate-900">{statsSummary?.total || 0}</p>
               </div>
               <div className="p-4 bg-emerald-50 rounded-xl">
                 <p className="text-xs text-emerald-600 mb-1">Đã liên hệ</p>
                 <p className="text-2xl font-bold text-emerald-700">
-                  {statsLeads.filter(l => l.status === 'Đã liên hệ').length}
+                  {statsSummary?.statusCounts['Đã liên hệ'] || 0}
                 </p>
               </div>
               <div className="p-4 bg-blue-50 rounded-xl">
                 <p className="text-xs text-blue-600 mb-1">Đã booking/cọc</p>
                 <p className="text-2xl font-bold text-blue-700">
-                  {statsLeads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length}
+                  {(statsSummary?.resultCounts['Đã booking'] || 0) + (statsSummary?.resultCounts['Đã cọc'] || 0)}
                 </p>
               </div>
               <div className="p-4 bg-amber-50 rounded-xl">
                 <p className="text-xs text-amber-600 mb-1">Đang tư vấn</p>
                 <p className="text-2xl font-bold text-amber-700">
-                  {statsLeads.filter(l => l.subStatus === 'Đang tư vấn').length}
+                  {statsSummary?.subStatusCounts['Đang tư vấn'] || 0}
                 </p>
               </div>
             </div>
@@ -682,32 +733,35 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         <>
           <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
             <div className="flex space-x-1 md:space-x-2 border-b border-slate-200 min-w-max">
-              {statuses.map(status => (
-                <button
-                  key={status}
-                  onClick={() => setCurrentTab(status)}
-                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 flex items-center gap-1.5 ${
-                    currentTab === status
-                      ? 'border-emerald-600 text-emerald-600 font-bold'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  <span>{status}</span>
-                  {countsByStatus[status] !== undefined && (
+              {statuses.map(status => {
+                const count = status === 'Tất cả' 
+                  ? (statsSummary?.total || 0) 
+                  : (statsSummary?.statusCounts[status] || 0);
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setCurrentTab(status)}
+                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 flex items-center gap-2 ${
+                      currentTab === status
+                        ? 'border-emerald-600 text-emerald-600 font-bold'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>{status}</span>
                     <span className={`px-2 py-0.5 text-xs rounded-full ${
-                      currentTab === status ? 'bg-emerald-100 text-emerald-700 font-bold' : 'bg-slate-100 text-slate-600'
+                      currentTab === status ? 'bg-emerald-100 text-emerald-700 font-semibold' : 'bg-slate-100 text-slate-600'
                     }`}>
-                      {countsByStatus[status]}
+                      {count}
                     </span>
-                  )}
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="space-y-3">
         <AnimatePresence mode="popLayout">
-          {displayedLeads.length === 0 && !isFetchingLeads ? (
+          {displayedLeads.length === 0 && !isLoadingLeads ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 md:py-20 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
               <User className="w-10 h-10 md:w-12 md:h-12 mb-4 opacity-20" />
               <p className="text-sm px-4 text-center">Không tìm thấy khách hàng nào. Hãy tạo mới để bắt đầu.</p>
@@ -841,7 +895,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                                       e.stopPropagation();
                                       handleDeleteLead(lead);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2"
                                   >
                                     <Trash2 className="w-4 h-4" /> Xoá khách hàng
                                   </button>
@@ -862,19 +916,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         </AnimatePresence>
         
         {hasMore && (
-          <div ref={sentinelRef} className="flex flex-col items-center justify-center py-6 gap-2">
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
-              <svg className="animate-spin h-5 w-5 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Đang tải thêm khách hàng...
-            </div>
-            <button
-              onClick={handleLoadNextPage}
-              className="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-all shadow-sm border border-slate-200"
+          <div ref={sentinelRef} className="flex items-center justify-center py-6 gap-2 text-slate-500 text-sm">
+            <svg className="animate-spin h-5 w-5 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Đang tải thêm 20 khách hàng tiếp theo...</span>
+          </div>
+        )}
+      </div>
+    </>
+  )}assName="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-all shadow-sm border border-slate-200"
             >
-              Tải thêm 20 khách hàng tiếp theo
+              Tải thêm ngay ({filteredLeads.length - visibleCount} khách hàng còn lại)
             </button>
           </div>
         )}

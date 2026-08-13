@@ -187,53 +187,269 @@ export const deleteLead = async (lead: Lead): Promise<void> => {
   await executeMutation('leads', 'DELETE', lead, `DELETE FROM leads WHERE id = ${escapeSQL(lead.id)} LIMIT 1`);
 };
 
-export interface FetchLeadsParams {
-  page?: number;
-  limit?: number;
-  status?: string;
+export const ESSENTIAL_LEAD_COLUMNS = 'id, creatorEmail, createdAt, assignedToEmail, assignedByEmail, assignedAt, isUpdatedByAssignee, departmentId, projectId, customerCode, customerName, phone, email, status, subStatus, appointmentStatus, resultStatus, interestLevel, updatedAt, updatedByEmail';
+
+export interface LeadStatsSummary {
+  total: number;
+  statusCounts: {
+    'Tất cả': number;
+    'Chưa liên hệ': number;
+    'Không liên hệ được': number;
+    'Đã liên hệ': number;
+    [key: string]: number;
+  };
+  resultCounts: {
+    'Chưa booking': number;
+    'Đã booking': number;
+    'Đã cọc': number;
+    [key: string]: number;
+  };
+  subStatusCounts: {
+    'Đang tư vấn': number;
+    'Rác / Không quan tâm': number;
+    'Thuê bao': number;
+    'Không bắt máy': number;
+    'Bận': number;
+    [key: string]: number;
+  };
+  projectCounts: Record<string, number>;
+  deptCounts: Record<string, number>;
+  dailyCounts: Array<{ date: string; count: number }>;
+}
+
+export interface LeadFilterOptions {
+  role?: UserRole;
+  userEmail?: string;
+  departmentIds?: string[];
   projectId?: string;
-  departmentId?: string;
-  allowedDeptIds?: string[];
+  status?: string; // 'Tất cả', 'Chưa liên hệ', 'Không liên hệ được', 'Đã liên hệ'
   assignFilter?: 'all' | 'mine' | 'assigned_by_me';
   searchTerm?: string;
-  userEmail?: string;
-  userRole?: string;
+  selectedDeptId?: string;
+  subDeptIds?: string[];
 }
 
-export interface FetchLeadsResponse {
-  success: boolean;
-  total: number;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-  countsByStatus: Record<string, number>;
+export interface FetchPaginatedLeadsParams extends LeadFilterOptions {
+  page?: number;
+  limit?: number; // Default 20
+}
+
+export interface FetchPaginatedLeadsResult {
   leads: Lead[];
+  totalCount: number;
+  page: number;
+  hasMore: boolean;
 }
 
-export const fetchLeadsPaginated = async (params: FetchLeadsParams): Promise<FetchLeadsResponse> => {
+export const buildBaseWhereClause = (options: LeadFilterOptions, includeStatus: boolean = true): string => {
+  const conditions: string[] = [];
+
+  // Role & Department permission filtering
+  if (options.role === 'staff' && options.userEmail) {
+    const emailEsc = escapeSQL(options.userEmail);
+    let staffCond = `(assignedToEmail = ${emailEsc} OR creatorEmail = ${emailEsc})`;
+    if (options.departmentIds && options.departmentIds.length > 0 && options.departmentIds.length <= 50) {
+      const ids = options.departmentIds.map(id => escapeSQL(id)).join(', ');
+      staffCond += ` AND departmentId IN (${ids})`;
+    }
+    conditions.push(`(${staffCond})`);
+  } else if (['gds', 'tp'].includes(options.role || '') && options.departmentIds && options.departmentIds.length > 0 && options.departmentIds.length <= 50) {
+    const ids = options.departmentIds.map(id => escapeSQL(id)).join(', ');
+    conditions.push(`departmentId IN (${ids})`);
+  }
+
+  // Selected Department Filter (e.g. subDeptIds from UI dropdown)
+  if (options.subDeptIds && options.subDeptIds.length > 0) {
+    const ids = options.subDeptIds.map(id => escapeSQL(id)).join(', ');
+    conditions.push(`departmentId IN (${ids})`);
+  } else if (options.selectedDeptId) {
+    conditions.push(`departmentId = ${escapeSQL(options.selectedDeptId)}`);
+  }
+
+  // Project Filter
+  if (options.projectId) {
+    conditions.push(`projectId = ${escapeSQL(options.projectId)}`);
+  }
+
+  // Status Tab Filter (only if includeStatus is true)
+  if (includeStatus && options.status && options.status !== 'Tất cả') {
+    conditions.push(`status = ${escapeSQL(options.status)}`);
+  }
+
+  // Assignee Filter
+  if (options.assignFilter === 'mine' && options.userEmail) {
+    conditions.push(`assignedToEmail = ${escapeSQL(options.userEmail)}`);
+  } else if (options.assignFilter === 'assigned_by_me' && options.userEmail) {
+    const emailEsc = escapeSQL(options.userEmail);
+    conditions.push(`(assignedByEmail = ${emailEsc} AND assignedToEmail != ${emailEsc})`);
+  }
+
+  // Search Filter
+  if (options.searchTerm && options.searchTerm.trim() !== '') {
+    const term = `%${options.searchTerm.trim()}%`;
+    const termEsc = escapeSQL(term);
+    conditions.push(`(customerName LIKE ${termEsc} OR phone LIKE ${termEsc} OR email LIKE ${termEsc})`);
+  }
+
+  return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+};
+
+export const fetchLeadStats = async (
+  options: Omit<LeadFilterOptions, 'status'>
+): Promise<LeadStatsSummary> => {
+  const whereClause = buildBaseWhereClause(options, false);
+
+  const sqlGroup = `
+    SELECT 
+      status, 
+      subStatus, 
+      resultStatus, 
+      projectId, 
+      departmentId, 
+      COUNT(*) as count 
+    FROM leads 
+    ${whereClause} 
+    GROUP BY status, subStatus, resultStatus, projectId, departmentId
+  `;
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+  const dateWhere = whereClause 
+    ? `${whereClause} AND createdAt >= ${escapeSQL(sevenDaysAgoStr)}`
+    : `WHERE createdAt >= ${escapeSQL(sevenDaysAgoStr)}`;
+
+  const sqlDaily = `
+    SELECT DATE(createdAt) as dateStr, COUNT(*) as count 
+    FROM leads 
+    ${dateWhere} 
+    GROUP BY DATE(createdAt)
+  `;
+
   try {
-    const res = await fetch('/api/leads/list', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.success) {
-        return data;
+    const [groupData, dailyData] = await Promise.all([
+      queryDB(sqlGroup),
+      queryDB(sqlDaily).catch(() => [])
+    ]);
+
+    let total = 0;
+    const statusCounts: Record<string, number> = {
+      'Tất cả': 0,
+      'Chưa liên hệ': 0,
+      'Không liên hệ được': 0,
+      'Đã liên hệ': 0
+    };
+    const resultCounts: Record<string, number> = {
+      'Chưa booking': 0,
+      'Đã booking': 0,
+      'Đã cọc': 0
+    };
+    const subStatusCounts: Record<string, number> = {
+      'Đang tư vấn': 0,
+      'Rác / Không quan tâm': 0,
+      'Thuê bao': 0,
+      'Không bắt máy': 0,
+      'Bận': 0
+    };
+    const projectCounts: Record<string, number> = {};
+    const deptCounts: Record<string, number> = {};
+
+    if (Array.isArray(groupData)) {
+      for (const row of groupData) {
+        const c = Number(row.count) || 0;
+        total += c;
+
+        if (row.status) {
+          statusCounts[row.status] = (statusCounts[row.status] || 0) + c;
+        }
+        if (row.resultStatus) {
+          resultCounts[row.resultStatus] = (resultCounts[row.resultStatus] || 0) + c;
+        }
+        if (row.subStatus) {
+          subStatusCounts[row.subStatus] = (subStatusCounts[row.subStatus] || 0) + c;
+        }
+        if (row.projectId) {
+          projectCounts[row.projectId] = (projectCounts[row.projectId] || 0) + c;
+        }
+        if (row.departmentId) {
+          deptCounts[row.departmentId] = (deptCounts[row.departmentId] || 0) + c;
+        }
       }
     }
-  } catch (e) {
-    console.error('fetchLeadsPaginated error:', e);
+    statusCounts['Tất cả'] = total;
+
+    const last7DaysDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+
+    const dailyMap: Record<string, number> = {};
+    if (Array.isArray(dailyData)) {
+      for (const row of dailyData) {
+        const dStr = row.dateStr ? String(row.dateStr).substring(0, 10) : '';
+        if (dStr) {
+          dailyMap[dStr] = Number(row.count) || 0;
+        }
+      }
+    }
+
+    const dailyCounts = last7DaysDates.map(dStr => ({
+      date: dStr.split('-').slice(1).reverse().join('/'),
+      count: dailyMap[dStr] || 0
+    }));
+
+    return {
+      total,
+      statusCounts: statusCounts as any,
+      resultCounts: resultCounts as any,
+      subStatusCounts: subStatusCounts as any,
+      projectCounts,
+      deptCounts,
+      dailyCounts
+    };
+  } catch (err) {
+    console.error('fetchLeadStats error:', err);
+    return {
+      total: 0,
+      statusCounts: { 'Tất cả': 0, 'Chưa liên hệ': 0, 'Không liên hệ được': 0, 'Đã liên hệ': 0 },
+      resultCounts: { 'Chưa booking': 0, 'Đã booking': 0, 'Đã cọc': 0 },
+      subStatusCounts: { 'Đang tư vấn': 0, 'Rác / Không quan tâm': 0, 'Thuê bao': 0, 'Không bắt máy': 0, 'Bận': 0 },
+      projectCounts: {},
+      deptCounts: {},
+      dailyCounts: []
+    };
   }
+};
+
+export const fetchPaginatedLeads = async (
+  params: FetchPaginatedLeadsParams
+): Promise<FetchPaginatedLeadsResult> => {
+  const page = params.page || 1;
+  const limit = params.limit || 20;
+  const offset = (page - 1) * limit;
+
+  const whereClause = buildBaseWhereClause(params, true);
+
+  const countSql = `SELECT COUNT(*) as total FROM leads ${whereClause}`;
+  const dataSql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT ${limit} OFFSET ${offset}`;
+
+  const [countRes, dataRes] = await Promise.all([
+    queryDB(countSql),
+    queryDB(dataSql)
+  ]);
+
+  const totalCount = (countRes && countRes[0] && countRes[0].total) ? Number(countRes[0].total) : 0;
+  const leads = (Array.isArray(dataRes) ? dataRes : []).map(parseLead);
+
+  const hasMore = offset + leads.length < totalCount;
+
   return {
-    success: false,
-    total: 0,
-    page: 1,
-    limit: 20,
-    hasMore: false,
-    countsByStatus: { 'Tất cả': 0, 'Chưa liên hệ': 0, 'Không liên hệ được': 0, 'Đã liên hệ': 0 },
-    leads: []
+    leads,
+    totalCount,
+    page,
+    hasMore
   };
 };
 
@@ -249,11 +465,28 @@ export const getLeadById = async (id: string): Promise<Lead | null> => {
   return null;
 };
 
-export const subscribeToLeads = (
+export const fetchRecentLeads = async (
+  limit: number = 5,
+  role?: UserRole,
+  email?: string,
+  departmentIds?: string[]
+): Promise<Lead[]> => {
+  const whereClause = buildBaseWhereClause({ role, userEmail: email, departmentIds }, false);
+  const sql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT ${limit}`;
+  try {
+    const data = await queryDB(sql);
+    return (Array.isArray(data) ? data : []).map(parseLead);
+  } catch (e) {
+    console.error('fetchRecentLeads error:', e);
+    return [];
+  }
+};
+
+export const subscribeToLeadChanges = (
   role: UserRole,
   email: string,
   departmentIds: string[] | undefined,
-  callback: (leads: Lead[]) => void,
+  onChange: () => void,
   intervalMs: number = 5000
 ) => {
   let whereClause = '';
@@ -264,58 +497,20 @@ export const subscribeToLeads = (
 
   let isMounted = true;
   let lastPingState = '';
-  let isFetching = false;
-
-  const fetchFullLeads = async () => {
-    if (isFetching) return;
-    isFetching = true;
-    try {
-      const sql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT 1000`;
-      const data = await queryDB(sql);
-      if (isMounted && Array.isArray(data)) {
-        let leads = data.map(parseLead);
-
-        if (['tgd', 'admin'].includes(role)) {
-          // Sees everything
-        } else if (['gds', 'tp'].includes(role)) {
-          if (departmentIds) {
-            leads = leads.filter(l => l.departmentId && departmentIds.includes(l.departmentId));
-          }
-        } else if (role === 'staff') {
-          leads = leads.filter(l =>
-            (departmentIds && l.departmentId && departmentIds.includes(l.departmentId)) &&
-            (l.assignedToEmail === email || l.creatorEmail === email)
-          );
-        }
-
-        callback(leads);
-      }
-    } catch (e) {
-      console.error('fetchFullLeads error', e);
-    } finally {
-      isFetching = false;
-    }
-  };
 
   const pingCheck = async () => {
     try {
-      // Lightweight Ping: check total count & MAX(updatedAt) without pulling heavy lead payload
       const pingSql = `SELECT COUNT(*) as total, MAX(updatedAt) as maxUpdated FROM leads ${whereClause}`;
       const res = await queryDB(pingSql);
       if (isMounted && Array.isArray(res) && res.length > 0) {
         const currentState = `${res[0].total || 0}_${res[0].maxUpdated || ''}`;
         if (currentState !== lastPingState) {
           lastPingState = currentState;
-          await fetchFullLeads();
+          onChange();
         }
-      } else if (isMounted) {
-        await fetchFullLeads();
       }
     } catch (e) {
       console.error('pingCheck leads error', e);
-      if (isMounted && !lastPingState) {
-        await fetchFullLeads();
-      }
     }
   };
 
@@ -327,3 +522,23 @@ export const subscribeToLeads = (
     clearInterval(interval);
   };
 };
+
+export const subscribeToLeads = (
+  role: UserRole,
+  email: string,
+  departmentIds: string[] | undefined,
+  callback: (leads: Lead[]) => void,
+  intervalMs: number = 5000
+) => {
+  return subscribeToLeadChanges(
+    role,
+    email,
+    departmentIds,
+    async () => {
+      const leads = await fetchRecentLeads(50, role, email, departmentIds);
+      callback(leads);
+    },
+    intervalMs
+  );
+};
+

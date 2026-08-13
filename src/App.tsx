@@ -132,12 +132,18 @@ export default function App() {
     return ids.sort().join(',');
   }, [effectiveUser?.role, effectiveUser?.departmentId, departments]);
 
+  const [statsSummary, setStatsSummary] = useState<LeadStatsSummary | null>(null);
+
   useEffect(() => {
     if (!userRole || !userEmail) return;
 
     const allowedDeptIds = allowedDeptIdsStr === 'ALL'
       ? undefined
       : (allowedDeptIdsStr ? allowedDeptIdsStr.split(',') : undefined);
+
+    fetchLeadStats({ role: userRole, userEmail, departmentIds: allowedDeptIds }).then(setStatsSummary).catch(() => {});
+
+    const unsubLeads = subscribeToLeads(userRole, userEmail, allowedDeptIds, setLeads);
 
     const unsubMutations = subscribeToMutations((event) => {
       // Handle optimistic updates for each entity type
@@ -187,6 +193,7 @@ export default function App() {
     }
 
     return () => {
+      unsubLeads();
       unsubStaff();
       unsubMutations();
     };
@@ -234,7 +241,7 @@ export default function App() {
     if (!effectiveUser) return null;
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard leads={leads} departments={departments} user={effectiveUser} />;
+        return <Dashboard leads={leads} departments={departments} user={effectiveUser} statsSummary={statsSummary} />;
       case 'departments':
         return <DepartmentHierarchy departments={departments} user={effectiveUser} allUsers={filteredStaff} />;
       case 'leads':
@@ -244,6 +251,7 @@ export default function App() {
           <ProjectList 
             user={effectiveUser} 
             leads={leads}
+            statsSummary={statsSummary}
             onProjectClick={(projectId) => {
               setSelectedProjectId(projectId);
               setActiveTab('leads');
@@ -257,7 +265,7 @@ export default function App() {
       case 'settings':
         return <Settings user={effectiveUser} />;
       default:
-        return <Dashboard leads={leads} departments={departments} user={effectiveUser} />;
+        return <Dashboard leads={leads} departments={departments} user={effectiveUser} statsSummary={statsSummary} />;
     }
   };
 
