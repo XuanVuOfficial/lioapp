@@ -78,7 +78,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   // Status Update Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusForm, setStatusForm] = useState({
-    status: '',
+    status: 'Chưa liên hệ',
     subStatus: '',
     appointmentStatus: '',
     resultStatus: '',
@@ -89,10 +89,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const handleOpenStatusModal = () => {
     if (!selectedLead) return;
     setStatusForm({
-      status: '',
-      subStatus: '',
-      appointmentStatus: '',
-      resultStatus: '',
+      status: selectedLead.status || 'Chưa liên hệ',
+      subStatus: selectedLead.subStatus || '',
+      appointmentStatus: selectedLead.appointmentStatus || '',
+      resultStatus: selectedLead.resultStatus || '',
       note: ''
     });
     setShowStatusModal(true);
@@ -100,6 +100,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const isStatusFormValid = () => {
     if (!statusForm.status) return false;
+    if (statusForm.status === 'Chưa liên hệ') {
+      return true;
+    }
     if (statusForm.status === 'Không liên hệ được') {
       return Boolean(statusForm.subStatus);
     }
@@ -113,6 +116,14 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     return false;
   };
 
+  const getStatusUpdateCount = (history: string[] = []) => {
+    return history.filter(entry => 
+      entry.toLowerCase().includes('cập nhật trạng thái') || 
+      entry.toLowerCase().includes('cập nhật thông tin') ||
+      entry.includes('cập nhật Trạng thái')
+    ).length;
+  };
+
   const handleSaveStatusModal = async () => {
     if (!selectedLead || !isStatusFormValid() || isSavingStatus) return;
     setIsSavingStatus(true);
@@ -124,10 +135,11 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
       if (statusForm.resultStatus) parts.push(statusForm.resultStatus);
       const statusChain = parts.join(' > ');
 
+      const nextUpdateNumber = getStatusUpdateCount(selectedLead.history) + 1;
       const timestamp = new Date().toLocaleString('vi-VN');
       const username = user.displayName || user.email;
       const noteText = statusForm.note.trim() ? ` (note: ${statusForm.note.trim()})` : '';
-      const entry = `[LOG][${timestamp}] ${username}: cập nhật trạng thái "${statusChain}"${noteText}`;
+      const entry = `[LOG][${timestamp}] ${username}: cập nhật trạng thái LẦN ${nextUpdateNumber} "${statusChain}"${noteText}`;
 
       const updates: Partial<Lead> = {
         status: statusForm.status,
@@ -138,12 +150,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
       const updatedHistory = [...(selectedLead.history || []), entry];
       await updateLead(selectedLead.id, { ...updates, history: updatedHistory }, user.email);
-      setSelectedLead({
-        ...selectedLead,
+      setSelectedLead(prev => prev ? {
+        ...prev,
         ...updates,
         history: updatedHistory,
         isUpdatedByAssignee: true
-      });
+      } : null);
+      setDisplayedLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, ...updates, isUpdatedByAssignee: true } : l));
       setShowStatusModal(false);
     } catch (err: any) {
       alert('Lỗi khi cập nhật trạng thái: ' + (err.message || err));
@@ -179,12 +192,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     assignedToEmail: ''
   });
 
-  // Sync selectedLead with latest leads data
+  // Sync selectedLead with latest leads data without wiping its history and full fields
   useEffect(() => {
     if (selectedLead) {
       const updatedLead = displayedLeads.find(l => l.id === selectedLead.id);
       if (updatedLead) {
-        setSelectedLead(updatedLead);
+        setSelectedLead(prev => {
+          if (!prev || prev.id !== updatedLead.id) return prev;
+          return {
+            ...prev,
+            ...updatedLead,
+            history: (prev.history && prev.history.length > 0) ? prev.history : (updatedLead.history || [])
+          };
+        });
       }
     }
   }, [displayedLeads]);
@@ -644,6 +664,16 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const handleAssign = async (lead: Lead, staffEmail?: string, deptId?: string) => {
     await assignLead(lead.id, staffEmail, deptId, user.email);
+    if (selectedLead && selectedLead.id === lead.id) {
+      try {
+        const fullLead = await getLeadById(lead.id);
+        if (fullLead) {
+          setSelectedLead(fullLead);
+        }
+      } catch (e) {
+        console.error('Error refreshing assigned lead details', e);
+      }
+    }
     setShowAssignModal(null);
   };
 
@@ -1562,137 +1592,89 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
                 <section>
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Cập nhật thông tin</h4>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cập nhật thông tin</h4>
                   </div>
                   {(() => {
-                    // Extract all status update logs from history
-                    const statusLogs: Array<{
-                      timeStr: string;
-                      dateStr: string;
-                      chain: string;
-                      note: string;
-                      isNotReachable: boolean;
-                    }> = [];
-
-                    for (const entry of selectedLead.history || []) {
-                      if (!entry.startsWith('[LOG]')) continue;
-                      const cleanEntry = entry.replace(/^\[LOG\]/, '');
-                      const matchNew = cleanEntry.match(/^\[(.*?)\]\s*([^:]+):\s*cập nhật trạng thái "([^"]+)"(?:\s*\(note:\s*(.*?)\))?/i);
-                      if (matchNew) {
-                        const fullTimestamp = matchNew[1];
-                        const chain = matchNew[3];
-                        const note = matchNew[4] || '';
-                        let timeStr = fullTimestamp;
-                        const timeMatch = fullTimestamp.match(/(\d{1,2}:\d{2})/);
-                        if (timeMatch) timeStr = timeMatch[1];
-                        statusLogs.push({
-                          timeStr,
-                          dateStr: fullTimestamp,
-                          chain,
-                          note,
-                          isNotReachable: chain.toLowerCase().includes('không liên hệ được')
-                        });
-                        continue;
-                      }
-                      const matchOld = cleanEntry.match(/^\[(.*?)\]\s*([^:]+):\s*cập nhật Trạng thái là '([^']+)'/i);
-                      if (matchOld) {
-                        const fullTimestamp = matchOld[1];
-                        const chain = matchOld[3];
-                        let timeStr = fullTimestamp;
-                        const timeMatch = fullTimestamp.match(/(\d{1,2}:\d{2})/);
-                        if (timeMatch) timeStr = timeMatch[1];
-                        statusLogs.push({
-                          timeStr,
-                          dateStr: fullTimestamp,
-                          chain,
-                          note: '',
-                          isNotReachable: chain.toLowerCase().includes('không liên hệ được')
-                        });
-                      }
+                    const currentChainParts: string[] = [];
+                    if (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
+                      currentChainParts.push(selectedLead.status);
+                      if (selectedLead.subStatus) currentChainParts.push(selectedLead.subStatus);
+                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
+                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
+                    } else if (selectedLead.subStatus) {
+                      currentChainParts.push(selectedLead.status || 'Chưa liên hệ');
+                      currentChainParts.push(selectedLead.subStatus);
+                      if (selectedLead.appointmentStatus) currentChainParts.push(selectedLead.appointmentStatus);
+                      if (selectedLead.resultStatus) currentChainParts.push(selectedLead.resultStatus);
                     }
 
-                    // If no logs found in history, check current lead status
-                    let effectiveLogs = [...statusLogs];
-                    if (effectiveLogs.length === 0 && selectedLead.status && selectedLead.status !== 'Chưa liên hệ') {
-                      const timeStr = selectedLead.updatedAt ? new Date(selectedLead.updatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-                      const chainParts = [selectedLead.status, selectedLead.subStatus, selectedLead.appointmentStatus, selectedLead.resultStatus].filter(Boolean);
-                      effectiveLogs.push({
-                        timeStr,
-                        dateStr: '',
-                        chain: chainParts.join(' > '),
-                        note: '',
-                        isNotReachable: selectedLead.status === 'Không liên hệ được'
-                      });
+                    const hasCustomStatus = currentChainParts.length > 0;
+                    const updateCount = getStatusUpdateCount(selectedLead.history);
+                    const nextUpdateNumber = updateCount + 1;
+
+                    // 1. Nếu chưa từng cập nhật hoặc trạng thái 'Chưa liên hệ'
+                    if (!hasCustomStatus || selectedLead.status === 'Chưa liên hệ') {
+                      return (
+                        <button
+                          type="button"
+                          onClick={handleOpenStatusModal}
+                          className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 group mb-4 cursor-pointer"
+                        >
+                          <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                          <span>Cập nhật thông tin {updateCount > 0 ? `(Lần ${nextUpdateNumber})` : ''}</span>
+                        </button>
+                      );
                     }
 
-                    const lastLog = effectiveLogs[effectiveLogs.length - 1];
-                    const isFinalConnected = lastLog ? !lastLog.isNotReachable : (selectedLead.status === 'Đã liên hệ');
-                    
-                    // In the list, previous attempts (or all attempts if still not reachable) are disabled
-                    const disabledLogs = isFinalConnected ? effectiveLogs.slice(0, -1) : effectiveLogs;
-                    const activeFinalLog = isFinalConnected ? effectiveLogs[effectiveLogs.length - 1] : null;
-
-                    return (
-                      <div className="flex flex-wrap items-center gap-2 mb-4">
-                        {/* Disabled Previous Attempt Cards */}
-                        {disabledLogs.map((log, idx) => (
-                          <div
-                            key={idx}
-                            className="px-2.5 py-1.5 bg-slate-100/90 border border-slate-200 rounded-xl flex flex-col justify-center min-w-[110px] max-w-[220px] shadow-2xs opacity-75 select-none"
-                            title={`Lần ${idx + 1} (${log.dateStr || log.timeStr}): ${log.chain}${log.note ? ` - note: ${log.note}` : ''}`}
-                          >
-                            <div className="flex items-center justify-between gap-1 text-[10px] text-slate-500 font-bold mb-0.5">
-                              <span className="flex items-center gap-0.5 font-mono text-[9px]">
-                                <Clock className="w-2.5 h-2.5 text-slate-400" />
-                                {log.timeStr}
-                              </span>
-                              <span className="text-[8px] bg-slate-200 px-1 py-0.2 rounded font-semibold text-slate-600">
-                                Lần {idx + 1}
-                              </span>
-                            </div>
-                            <p className="text-[10px] font-semibold text-slate-700 truncate leading-tight">
-                              {log.chain}
-                            </p>
-                          </div>
-                        ))}
-
-                        {/* Active Next Attempt Button (if not yet reached 'Đã liên hệ') */}
-                        {!isFinalConnected && (
-                          <button
-                            type="button"
-                            onClick={handleOpenStatusModal}
-                            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs shadow-xs hover:shadow-sm transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap group"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
-                            <span>
-                              {effectiveLogs.length === 0
-                                ? 'Cập nhật thông tin'
-                                : `Cập nhật thông tin lần ${effectiveLogs.length + 1}`}
+                    // 2. Nếu trạng thái là 'Không liên hệ được' -> Hiện button Cập nhật trạng thái lần X
+                    if (selectedLead.status === 'Không liên hệ được') {
+                      return (
+                        <button
+                          type="button"
+                          onClick={handleOpenStatusModal}
+                          className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 group mb-4 cursor-pointer"
+                        >
+                          <Edit3 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                          <span>Cập nhật trạng thái lần {nextUpdateNumber}</span>
+                          {selectedLead.subStatus && (
+                            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-md font-medium">
+                              (Hiện tại: {selectedLead.subStatus})
                             </span>
-                          </button>
-                        )}
+                          )}
+                        </button>
+                      );
+                    }
 
-                        {/* Final Success Card (if 'Đã liên hệ') */}
-                        {isFinalConnected && activeFinalLog && (
-                          <div
-                            onClick={handleOpenStatusModal}
-                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-xl flex flex-col justify-center min-w-[130px] max-w-[280px] shadow-2xs transition-all cursor-pointer group"
-                            title={`Lần ${effectiveLogs.length} (${activeFinalLog.dateStr || activeFinalLog.timeStr}): ${activeFinalLog.chain}`}
-                          >
-                            <div className="flex items-center justify-between gap-1.5 text-[10px] text-emerald-700 font-bold mb-0.5">
-                              <span className="flex items-center gap-0.5 font-mono text-[9px]">
-                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                                {activeFinalLog.timeStr}
+                    // 3. Nếu trạng thái 'Đã liên hệ' (hoặc đã có các bước chi tiết) -> Thẻ nhỏ gọn trên 1 dòng
+                    return (
+                      <div 
+                        onClick={handleOpenStatusModal}
+                        className="w-full px-3 py-2 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group mb-4 flex items-center justify-between gap-2 shadow-2xs"
+                      >
+                        <div className="flex items-center gap-1 min-w-0 overflow-x-auto scrollbar-hide py-0.5">
+                          {currentChainParts.map((part, idx) => (
+                            <React.Fragment key={idx}>
+                              <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0 whitespace-nowrap ${
+                                idx === 0 
+                                  ? 'bg-emerald-600 text-white shadow-2xs' 
+                                  : idx === 1 
+                                  ? 'bg-blue-600 text-white shadow-2xs' 
+                                  : idx === 2 
+                                  ? 'bg-indigo-600 text-white shadow-2xs' 
+                                  : 'bg-purple-600 text-white shadow-2xs'
+                              }`}>
+                                {part}
                               </span>
-                              <span className="flex items-center gap-0.5 text-[8px] bg-emerald-200/80 px-1 py-0.2 rounded font-bold text-emerald-800 group-hover:underline">
-                                <Edit3 className="w-2.5 h-2.5" /> Sửa
-                              </span>
-                            </div>
-                            <p className="text-[10px] font-bold text-emerald-900 truncate leading-tight">
-                              {activeFinalLog.chain}
-                            </p>
-                          </div>
-                        )}
+                              {idx < currentChainParts.length - 1 && (
+                                <span className="text-slate-300 font-bold text-[10px] shrink-0">›</span>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 shrink-0 group-hover:underline pl-1 border-l border-slate-200">
+                          <Edit3 className="w-3 h-3" />
+                          <span>Thay đổi</span>
+                        </div>
                       </div>
                     );
                   })()}
@@ -1711,7 +1693,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                               const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
                               const updatedHistory = [...(selectedLead.history || []), entry];
                               await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
-                              setSelectedLead({ ...selectedLead, history: updatedHistory });
+                              setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
                               setNewNote('');
                             }
                           }}
@@ -1726,7 +1708,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
                             const updatedHistory = [...(selectedLead.history || []), entry];
                             await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
-                            setSelectedLead({ ...selectedLead, history: updatedHistory });
+                            setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
                             setNewNote('');
                           }}
                           className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-all"
@@ -1886,7 +1868,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
                 >
-                  <option value="">-- Chọn trạng thái --</option>
+                  <option value="Chưa liên hệ">Chưa liên hệ</option>
                   <option value="Không liên hệ được">Không liên hệ được</option>
                   <option value="Đã liên hệ">Đã liên hệ</option>
                 </select>
@@ -1986,7 +1968,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Lịch sử sẽ ghi nhận:</p>
                 <p className="text-xs font-medium text-slate-700 break-words">
-                  Cập nhật trạng thái "{[
+                  Cập nhật trạng thái LẦN {getStatusUpdateCount(selectedLead.history) + 1} "{[
                     statusForm.status,
                     statusForm.subStatus,
                     statusForm.appointmentStatus,
