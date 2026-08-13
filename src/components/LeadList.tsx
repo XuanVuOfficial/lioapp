@@ -227,7 +227,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     return allowedDepartments.map(d => d.id);
   }, [selectedDeptId, allowedDepartments, getSubDeptIdsRecursive]);
 
-  // 1. Fetch Stats Summary (Only runs on project/dept/search change or mutation - NOT on tab change)
+  // 1. Fetch Stats Summary (Lazy loaded ONLY when clicking "Thống kê" - NOT on page load/filter/tab change)
   const loadStats = React.useCallback(async () => {
     try {
       const statsRes = await fetchLeadStats({
@@ -244,11 +244,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     }
   }, [user.role, user.email, activeSubDeptIds, selectedProjectId, assignFilter, searchTerm]);
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
-  // 2. Fetch 20 Leads for currently active Tab (Runs when currentTab OR filters change - EXACTLY 1 API call per tab)
+  // 2. Fetch 20 Leads for currently active Tab (FAST: Exactly 1 single 20-item query per tab/filter)
   const loadTabLeads = React.useCallback(async () => {
     setIsLoadingLeads(true);
     setPage(1);
@@ -280,9 +276,11 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   }, [loadTabLeads]);
 
   const refreshLeadsAndStats = React.useCallback(() => {
-    loadStats();
     loadTabLeads();
-  }, [loadStats, loadTabLeads]);
+    if (showStats) {
+      loadStats();
+    }
+  }, [loadTabLeads, loadStats, showStats]);
 
   // Realtime subscription ping
   useEffect(() => {
@@ -655,7 +653,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         
         <div className="flex items-center w-full sm:w-auto">
           <button
-            onClick={() => setShowStats(!showStats)}
+            onClick={() => {
+              const nextShow = !showStats;
+              setShowStats(nextShow);
+              if (nextShow) {
+                loadStats();
+              }
+            }}
             className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm ${
               showStats 
                 ? 'bg-emerald-600 text-white' 
