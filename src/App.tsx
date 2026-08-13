@@ -139,8 +139,6 @@ export default function App() {
       ? undefined
       : (allowedDeptIdsStr ? allowedDeptIdsStr.split(',') : undefined);
 
-    const unsubLeads = subscribeToLeads(userRole, userEmail, allowedDeptIds, setLeads);
-
     const unsubMutations = subscribeToMutations((event) => {
       // Handle optimistic updates for each entity type
       if (event.entity === 'leads') {
@@ -189,7 +187,6 @@ export default function App() {
     }
 
     return () => {
-      unsubLeads();
       unsubStaff();
       unsubMutations();
     };

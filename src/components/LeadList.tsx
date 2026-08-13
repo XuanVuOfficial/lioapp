@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X, Loader2 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, Clock, User, Tag, MoreVertical, Edit2, Trash2, UserPlus, Image as ImageIcon, History, Briefcase, Check, FolderKanban, LayoutGrid, List, MessageSquare, PhoneCall, MessageCircle, BarChart3, Download, Calendar, X } from 'lucide-react';
 import { Lead, Department, UserProfile, Project } from '../types';
-import { createLead, updateLead, assignLead, deleteLead, getLeadById, getPaginatedLeads } from '../services/leadService';
+import { createLead, updateLead, assignLead, deleteLead, getLeadById, fetchLeadsPaginated } from '../services/leadService';
 import { queryDB, escapeSQL } from '../api';
 import { exportLeadsToExcel } from '../utils/excelExport';
 
@@ -44,7 +44,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [selectedAssignDeptId, setSelectedAssignDeptId] = useState<string>('');
   const [showStats, setShowStats] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [visibleCount, setVisibleCount] = useState(30);
+  
+  // Server-side Pagination & Tab Filtering State
+  const [paginatedLeads, setPaginatedLeads] = useState<Lead[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isFetchingLeads, setIsFetchingLeads] = useState(false);
+  const [countsByStatus, setCountsByStatus] = useState<Record<string, number>>({
+    'Tất cả': 0,
+    'Chưa liên hệ': 0,
+    'Không liên hệ được': 0,
+    'Đã liên hệ': 0
+  });
+
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
 
   // Export Excel Modal State
@@ -58,11 +70,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     type: 'project' | 'department' | 'staff' | null;
     searchTerm: string;
   }>({ type: null, searchTerm: '' });
-
-  // Reset visible count when filters or search terms change to keep loading fast
-  useEffect(() => {
-    setVisibleCount(30);
-  }, [searchTerm, currentTab, assignFilter, selectedProjectId, selectedDeptId]);
 
   const [, setTick] = useState(0);
 
@@ -94,12 +101,18 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   // Sync selectedLead with latest leads data
   useEffect(() => {
     if (selectedLead) {
-      const updatedLead = leads.find(l => l.id === selectedLead.id);
+      const updatedLead = paginatedLeads.find(l => l.id === selectedLead.id);
       if (updatedLead) {
-        setSelectedLead(updatedLead);
+        setSelectedLead(prev => prev ? {
+          ...updatedLead,
+          history: (prev.history && prev.history.length > 0) ? prev.history : (updatedLead.history || []),
+          notes: prev.notes || updatedLead.notes || '',
+          details: prev.details || updatedLead.details || '',
+          imageUrl: prev.imageUrl || updatedLead.imageUrl || ''
+        } : null);
       }
     }
-  }, [leads]);
+  }, [paginatedLeads]);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -171,7 +184,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   };
 
   const getLeadsToExport = () => {
-    let list = filteredLeads;
+    let list = paginatedLeads;
     if (exportStartDate) {
       const start = new Date(exportStartDate + 'T00:00:00');
       if (!isNaN(start.getTime())) {
@@ -218,29 +231,22 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const allowedDepartments = React.useMemo(() => {
     if (['tgd', 'admin'].includes(user.role)) return departments;
     if (['gds', 'tp'].includes(user.role)) {
-      const baseIds = (user.managedDeptIds && user.managedDeptIds.length > 0) 
-        ? user.managedDeptIds 
-        : (user.departmentId ? [user.departmentId] : []);
-        
-      // Get all managed depts and their children
-      const getAllSubDeptIds = (deptId: string): string[] => {
-        const ids = [deptId];
-        departments.filter(d => d.parentId === deptId).forEach(child => {
-          ids.push(...getAllSubDeptIds(child.id));
+      if (user.managedDeptIds && user.managedDeptIds.length > 0) {
+        const allManagedIds = new Set<string>();
+        user.managedDeptIds.forEach(id => {
+          getSubDeptIdsRecursive(id).forEach(subId => allManagedIds.add(subId));
         });
-        return ids;
-      };
-      
-      const allAllowedIds = new Set<string>();
-      baseIds.forEach(id => {
-        getAllSubDeptIds(id).forEach(subId => allAllowedIds.add(subId));
-      });
-      
-      return departments.filter(d => allAllowedIds.has(d.id));
+        return departments.filter(d => allManagedIds.has(d.id));
+      }
+      if (user.departmentId) {
+        const managedIds = getSubDeptIdsRecursive(user.departmentId);
+        return departments.filter(d => managedIds.includes(d.id));
+      }
+      return [];
     }
     // Staff only sees their own department
     return departments.filter(d => d.id === user.departmentId);
-  }, [user, departments]);
+  }, [user, departments, getSubDeptIdsRecursive]);
 
   useEffect(() => {
     if (departments.length > 0 && !hasInitializedDept) {
@@ -256,82 +262,63 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     }
   }, [departments, allowedDepartments, user.role, hasInitializedDept]);
 
-  // Paginated batch state (20 items per load)
-  const [paginatedLeads, setPaginatedLeads] = useState<Lead[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
-    'Tất cả': 0,
-    'Chưa liên hệ': 0,
-    'Không liên hệ được': 0,
-    'Đã liên hệ': 0
-  });
-  const [hasMorePages, setHasMorePages] = useState<boolean>(false);
-  const [isLoadingInitial, setIsLoadingInitial] = useState<boolean>(true);
-  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
-
-  const fetchLeadsBatch = React.useCallback(async (resetList: boolean = false) => {
-    if (resetList) {
-      setIsLoadingInitial(true);
-    } else {
-      if (isLoadingMore || !hasMorePages) return;
-      setIsLoadingMore(true);
-    }
-
-    let targetDeptIds: string[] | undefined = undefined;
-    if (selectedDeptId) {
-      targetDeptIds = getSubDeptIdsRecursive(selectedDeptId);
-    } else if (allowedDepartments.length > 0) {
-      targetDeptIds = allowedDepartments.map(d => d.id);
-    }
-
-    const currentOffset = resetList ? 0 : paginatedLeads.length;
-
+  // Server-side Paginated Leads Fetcher
+  const loadLeadsPage = React.useCallback(async (targetPage: number, append: boolean = false) => {
+    setIsFetchingLeads(true);
     try {
-      const res = await getPaginatedLeads({
-        role: user.role,
-        email: user.email,
-        departmentIds: targetDeptIds,
-        selectedProjectId,
-        statusTab: currentTab,
+      const allowedDeptIds = allowedDepartments.map(d => d.id);
+      const res = await fetchLeadsPaginated({
+        page: targetPage,
+        limit: 20,
+        status: currentTab,
+        projectId: selectedProjectId,
+        departmentId: selectedDeptId,
+        allowedDeptIds,
         assignFilter,
         searchTerm,
-        limit: 20,
-        offset: currentOffset,
+        userEmail: user.email,
+        userRole: user.role
       });
 
-      if (resetList) {
-        setPaginatedLeads(res.leads);
-      } else {
-        setPaginatedLeads(prev => {
-          const existingIds = new Set(prev.map(l => l.id));
-          const newItems = res.leads.filter(l => !existingIds.has(l.id));
-          return [...prev, ...newItems];
-        });
+      if (res && res.success) {
+        if (append) {
+          setPaginatedLeads(prev => {
+            const existingIds = new Set(prev.map(l => l.id));
+            const newItems = res.leads.filter(l => !existingIds.has(l.id));
+            return [...prev, ...newItems];
+          });
+        } else {
+          setPaginatedLeads(res.leads);
+        }
+        setCountsByStatus(res.countsByStatus);
+        setHasMore(res.hasMore);
+        setPage(targetPage);
       }
-
-      setTotalCount(res.total);
-      setStatusCounts(res.statusCounts);
-      setHasMorePages(res.hasMore);
     } catch (e) {
-      console.error('fetchLeadsBatch error', e);
+      console.error('Error loading paginated leads:', e);
     } finally {
-      setIsLoadingInitial(false);
-      setIsLoadingMore(false);
+      setIsFetchingLeads(false);
     }
-  }, [selectedDeptId, allowedDepartments, paginatedLeads.length, isLoadingMore, hasMorePages, user.role, user.email, selectedProjectId, currentTab, assignFilter, searchTerm, getSubDeptIdsRecursive]);
+  }, [currentTab, selectedProjectId, selectedDeptId, allowedDepartments, assignFilter, searchTerm, user.email, user.role]);
 
-  // 1. Fetch first batch of 20 when filters/tabs change
+  // Reset to Page 1 on Filter or Tab change
   useEffect(() => {
-    fetchLeadsBatch(true);
-  }, [searchTerm, currentTab, assignFilter, selectedProjectId, selectedDeptId, user.role, user.email, allowedDepartments]);
+    loadLeadsPage(1, false);
+  }, [currentTab, selectedProjectId, selectedDeptId, assignFilter, searchTerm, loadLeadsPage]);
 
-  // 2. Infinite scroll using IntersectionObserver (loads 20 items per batch when near bottom)
+  // Load next page on scroll
+  const handleLoadNextPage = React.useCallback(() => {
+    if (hasMore && !isFetchingLeads) {
+      loadLeadsPage(page + 1, true);
+    }
+  }, [hasMore, isFetchingLeads, page, loadLeadsPage]);
+
   useEffect(() => {
-    if (!hasMorePages || isLoadingMore || isLoadingInitial) return;
+    if (!hasMore || isFetchingLeads) return;
 
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
-        fetchLeadsBatch(false);
+        handleLoadNextPage();
       }
     }, {
       rootMargin: '200px',
@@ -347,7 +334,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         observer.unobserve(currentSentinel);
       }
     };
-  }, [hasMorePages, isLoadingMore, isLoadingInitial, paginatedLeads.length, fetchLeadsBatch]);
+  }, [hasMore, isFetchingLeads, handleLoadNextPage]);
 
   const displayedLeads = paginatedLeads;
 
@@ -695,33 +682,32 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         <>
           <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
             <div className="flex space-x-1 md:space-x-2 border-b border-slate-200 min-w-max">
-              {statuses.map(status => {
-                const count = statusCounts[status] || 0;
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setCurrentTab(status)}
-                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 flex items-center gap-2 ${
-                      currentTab === status
-                        ? 'border-emerald-600 text-emerald-600 font-bold'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    <span>{status}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      currentTab === status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+              {statuses.map(status => (
+                <button
+                  key={status}
+                  onClick={() => setCurrentTab(status)}
+                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 flex items-center gap-1.5 ${
+                    currentTab === status
+                      ? 'border-emerald-600 text-emerald-600 font-bold'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <span>{status}</span>
+                  {countsByStatus[status] !== undefined && (
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      currentTab === status ? 'bg-emerald-100 text-emerald-700 font-bold' : 'bg-slate-100 text-slate-600'
                     }`}>
-                      {count}
+                      {countsByStatus[status]}
                     </span>
-                  </button>
-                );
-              })}
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="space-y-3">
         <AnimatePresence mode="popLayout">
-          {filteredLeads.length === 0 ? (
+          {displayedLeads.length === 0 && !isFetchingLeads ? (
             <div className="col-span-full flex flex-col items-center justify-center py-12 md:py-20 text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
               <User className="w-10 h-10 md:w-12 md:h-12 mb-4 opacity-20" />
               <p className="text-sm px-4 text-center">Không tìm thấy khách hàng nào. Hãy tạo mới để bắt đầu.</p>
@@ -875,18 +861,23 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
           )}
         </AnimatePresence>
         
-          {/* Sentinel for Infinite Scroll (loads 20 items per batch) */}
+        {hasMore && (
           <div ref={sentinelRef} className="flex flex-col items-center justify-center py-6 gap-2">
-            {isLoadingMore && (
-              <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
-                <span>Đang tải thêm 20 đơn tiếp theo...</span>
-              </div>
-            )}
-            {!hasMorePages && paginatedLeads.length > 0 && (
-              <p className="text-xs text-slate-400">Đã hiển thị tất cả {totalCount} khách hàng</p>
-            )}
+            <div className="flex items-center gap-2 text-slate-500 text-sm">
+              <svg className="animate-spin h-5 w-5 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Đang tải thêm khách hàng...
+            </div>
+            <button
+              onClick={loadMore}
+              className="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-all shadow-sm border border-slate-200"
+            >
+              Tải thêm ngay ({filteredLeads.length - visibleCount} khách hàng còn lại)
+            </button>
           </div>
+        )}
       </div>
     </>
   )}

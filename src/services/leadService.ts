@@ -187,7 +187,55 @@ export const deleteLead = async (lead: Lead): Promise<void> => {
   await executeMutation('leads', 'DELETE', lead, `DELETE FROM leads WHERE id = ${escapeSQL(lead.id)} LIMIT 1`);
 };
 
-export const ESSENTIAL_LEAD_COLUMNS = 'id, creatorEmail, createdAt, assignedToEmail, assignedByEmail, assignedAt, isUpdatedByAssignee, departmentId, projectId, customerCode, customerName, phone, email, status, subStatus, appointmentStatus, resultStatus, interestLevel, updatedAt, updatedByEmail';
+export interface FetchLeadsParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  projectId?: string;
+  departmentId?: string;
+  allowedDeptIds?: string[];
+  assignFilter?: 'all' | 'mine' | 'assigned_by_me';
+  searchTerm?: string;
+  userEmail?: string;
+  userRole?: string;
+}
+
+export interface FetchLeadsResponse {
+  success: boolean;
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  countsByStatus: Record<string, number>;
+  leads: Lead[];
+}
+
+export const fetchLeadsPaginated = async (params: FetchLeadsParams): Promise<FetchLeadsResponse> => {
+  try {
+    const res = await fetch('/api/leads/list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        return data;
+      }
+    }
+  } catch (e) {
+    console.error('fetchLeadsPaginated error:', e);
+  }
+  return {
+    success: false,
+    total: 0,
+    page: 1,
+    limit: 20,
+    hasMore: false,
+    countsByStatus: { 'Tất cả': 0, 'Chưa liên hệ': 0, 'Không liên hệ được': 0, 'Đã liên hệ': 0 },
+    leads: []
+  };
+};
 
 export const getLeadById = async (id: string): Promise<Lead | null> => {
   try {
@@ -199,122 +247,6 @@ export const getLeadById = async (id: string): Promise<Lead | null> => {
     console.error('getLeadById error:', e);
   }
   return null;
-};
-
-export interface GetLeadsOptions {
-  role: UserRole;
-  email: string;
-  departmentIds?: string[];
-  selectedProjectId?: string;
-  statusTab?: string;
-  assignFilter?: 'all' | 'mine' | 'assigned_by_me';
-  searchTerm?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface PaginatedLeadsResult {
-  leads: Lead[];
-  total: number;
-  statusCounts: Record<string, number>;
-  hasMore: boolean;
-}
-
-export const getPaginatedLeads = async (options: GetLeadsOptions): Promise<PaginatedLeadsResult> => {
-  const {
-    role,
-    email,
-    departmentIds,
-    selectedProjectId,
-    statusTab = 'Tất cả',
-    assignFilter = 'all',
-    searchTerm = '',
-    limit = 20,
-    offset = 0,
-  } = options;
-
-  let whereClauses: string[] = ['1=1'];
-
-  // 1. Department Scope Filtering
-  if (departmentIds && departmentIds.length > 0) {
-    if (departmentIds.length <= 50) {
-      const ids = departmentIds.map(id => escapeSQL(id)).join(', ');
-      whereClauses.push(`departmentId IN (${ids})`);
-    }
-  }
-
-  // 2. Staff Role Filter
-  if (role === 'staff') {
-    whereClauses.push(`(assignedToEmail = ${escapeSQL(email)} OR creatorEmail = ${escapeSQL(email)})`);
-  }
-
-  // 3. Project Filter
-  if (selectedProjectId) {
-    whereClauses.push(`projectId = ${escapeSQL(selectedProjectId)}`);
-  }
-
-  // 4. Assignee Filter
-  if (assignFilter === 'mine') {
-    whereClauses.push(`assignedToEmail = ${escapeSQL(email)}`);
-  } else if (assignFilter === 'assigned_by_me') {
-    whereClauses.push(`assignedByEmail = ${escapeSQL(email)} AND (assignedToEmail IS NULL OR assignedToEmail != ${escapeSQL(email)})`);
-  }
-
-  // 5. Search Filter
-  if (searchTerm && searchTerm.trim()) {
-    const s = escapeSQL(`%${searchTerm.trim().toLowerCase()}%`);
-    whereClauses.push(`(LOWER(customerName) LIKE ${s} OR phone LIKE ${s} OR LOWER(email) LIKE ${s} OR LOWER(customerCode) LIKE ${s})`);
-  }
-
-  const baseWhere = whereClauses.join(' AND ');
-
-  // 6. Active Tab Status Filter
-  let tabWhere = baseWhere;
-  if (statusTab && statusTab !== 'Tất cả') {
-    tabWhere += ` AND status = ${escapeSQL(statusTab)}`;
-  }
-
-  try {
-    // Count total matching items for current tab
-    const countRes = await queryDB(`SELECT COUNT(*) as total FROM leads WHERE ${tabWhere}`);
-    const total = (Array.isArray(countRes) && countRes.length > 0) ? Number(countRes[0].total || 0) : 0;
-
-    // Status counts for tab badges
-    const statusCounts: Record<string, number> = { 'Tất cả': 0, 'Chưa liên hệ': 0, 'Không liên hệ được': 0, 'Đã liên hệ': 0 };
-    const statusRes = await queryDB(`SELECT status, COUNT(*) as cnt FROM leads WHERE ${baseWhere} GROUP BY status`);
-    if (Array.isArray(statusRes)) {
-      let grandTotal = 0;
-      for (const row of statusRes) {
-        const st = String(row.status || '');
-        const cnt = Number(row.cnt || 0);
-        grandTotal += cnt;
-        if (statusCounts.hasOwnProperty(st)) {
-          statusCounts[st] = cnt;
-        }
-      }
-      statusCounts['Tất cả'] = grandTotal;
-    }
-
-    // Query 20 items for requested offset page
-    const sql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads WHERE ${tabWhere} ORDER BY updatedAt DESC LIMIT ${limit} OFFSET ${offset}`;
-    const data = await queryDB(sql);
-    const leads = Array.isArray(data) ? data.map(parseLead) : [];
-
-    return {
-      leads,
-      total,
-      statusCounts,
-      hasMore: offset + leads.length < total,
-    };
-  } catch (e) {
-    console.error('getPaginatedLeads error:', e);
-    return {
-      leads: [],
-      total: 0,
-      statusCounts: { 'Tất cả': 0, 'Chưa liên hệ': 0, 'Không liên hệ được': 0, 'Đã liên hệ': 0 },
-      hasMore: false,
-    };
-  }
 };
 
 export const subscribeToLeads = (
@@ -367,6 +299,7 @@ export const subscribeToLeads = (
 
   const pingCheck = async () => {
     try {
+      // Lightweight Ping: check total count & MAX(updatedAt) without pulling heavy lead payload
       const pingSql = `SELECT COUNT(*) as total, MAX(updatedAt) as maxUpdated FROM leads ${whereClause}`;
       const res = await queryDB(pingSql);
       if (isMounted && Array.isArray(res) && res.length > 0) {

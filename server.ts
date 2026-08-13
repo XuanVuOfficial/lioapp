@@ -494,6 +494,117 @@ async function startServer() {
     return res.json({ success: true, message: 'Đã gửi webhook Zalo thành công' });
   });
 
+  // 5. Server-side Paginated Lead List API Endpoint
+  app.post('/api/leads/list', async (req, res) => {
+    try {
+      const params = req.body || {};
+      const page = Math.max(1, parseInt(params.page, 10) || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(params.limit, 10) || 20));
+      const offset = (page - 1) * limit;
+
+      const { status, projectId, departmentId, allowedDeptIds, assignFilter, searchTerm, userEmail, userRole } = params;
+
+      const clauses: string[] = [];
+
+      // 1. Role & Department Scoping
+      if (['tgd', 'admin'].includes(userRole)) {
+        if (departmentId) {
+          clauses.push(`departmentId = ${escapeSQL(departmentId)}`);
+        }
+      } else if (['gds', 'tp'].includes(userRole)) {
+        if (departmentId) {
+          clauses.push(`departmentId = ${escapeSQL(departmentId)}`);
+        } else if (Array.isArray(allowedDeptIds) && allowedDeptIds.length > 0) {
+          const ids = allowedDeptIds.map((id: string) => escapeSQL(id)).join(', ');
+          clauses.push(`departmentId IN (${ids})`);
+        }
+      } else if (userRole === 'staff') {
+        if (Array.isArray(allowedDeptIds) && allowedDeptIds.length > 0) {
+          const ids = allowedDeptIds.map((id: string) => escapeSQL(id)).join(', ');
+          clauses.push(`departmentId IN (${ids})`);
+        }
+        if (userEmail) {
+          clauses.push(`(LOWER(assignedToEmail) = LOWER(${escapeSQL(userEmail)}) OR LOWER(creatorEmail) = LOWER(${escapeSQL(userEmail)}))`);
+        }
+      }
+
+      // 2. Project Filter
+      if (projectId) {
+        clauses.push(`projectId = ${escapeSQL(projectId)}`);
+      }
+
+      // 3. Assignee Filter
+      if (userEmail) {
+        if (assignFilter === 'mine') {
+          clauses.push(`LOWER(assignedToEmail) = LOWER(${escapeSQL(userEmail)})`);
+        } else if (assignFilter === 'assigned_by_me') {
+          clauses.push(`LOWER(assignedByEmail) = LOWER(${escapeSQL(userEmail)}) AND LOWER(assignedToEmail) != LOWER(${escapeSQL(userEmail)})`);
+        }
+      }
+
+      // 4. Search Filter
+      if (searchTerm && typeof searchTerm === 'string' && searchTerm.trim() !== '') {
+        const term = escapeSQL(`%${searchTerm.trim().toLowerCase()}%`);
+        clauses.push(`(LOWER(customerName) LIKE ${term} OR phone LIKE ${term} OR LOWER(email) LIKE ${term} OR LOWER(customerCode) LIKE ${term})`);
+      }
+
+      const baseWhere = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+
+      // Tab Status Filter
+      let statusWhere = baseWhere;
+      if (status && status !== 'Tất cả') {
+        const statusClause = `status = ${escapeSQL(status)}`;
+        statusWhere = baseWhere ? `${baseWhere} AND ${statusClause}` : `WHERE ${statusClause}`;
+      }
+
+      // Counts by Status
+      const countsByStatus: Record<string, number> = {
+        'Tất cả': 0,
+        'Chưa liên hệ': 0,
+        'Không liên hệ được': 0,
+        'Đã liên hệ': 0
+      };
+
+      const [totalRows] = await dbPool.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) as c FROM leads ${baseWhere}`);
+      countsByStatus['Tất cả'] = Array.isArray(totalRows) && totalRows.length > 0 ? Number(totalRows[0].c) : 0;
+
+      const [statusRows] = await dbPool.query<mysql.RowDataPacket[]>(`SELECT status, COUNT(*) as c FROM leads ${baseWhere} GROUP BY status`);
+      if (Array.isArray(statusRows)) {
+        for (const r of statusRows) {
+          if (r.status && countsByStatus[r.status] !== undefined) {
+            countsByStatus[r.status] = Number(r.c);
+          }
+        }
+      }
+
+      const [totalStatusRows] = await dbPool.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) as c FROM leads ${statusWhere}`);
+      const totalForStatus = Array.isArray(totalStatusRows) && totalStatusRows.length > 0 ? Number(totalStatusRows[0].c) : 0;
+
+      const selectCols = 'id, creatorEmail, createdAt, assignedToEmail, assignedByEmail, assignedAt, isUpdatedByAssignee, departmentId, projectId, customerCode, customerName, phone, email, status, subStatus, appointmentStatus, resultStatus, interestLevel, updatedAt, updatedByEmail';
+      const [leadRows] = await dbPool.query<mysql.RowDataPacket[]>(`SELECT ${selectCols} FROM leads ${statusWhere} ORDER BY updatedAt DESC LIMIT ${limit} OFFSET ${offset}`);
+
+      const parsedLeads = Array.isArray(leadRows) ? leadRows.map(r => ({
+        ...r,
+        history: [],
+        notes: '',
+        details: ''
+      })) : [];
+
+      return res.json({
+        success: true,
+        total: totalForStatus,
+        page,
+        limit,
+        hasMore: offset + parsedLeads.length < totalForStatus,
+        countsByStatus,
+        leads: parsedLeads
+      });
+    } catch (err: any) {
+      console.error('[Leads List API] Error:', err);
+      return res.status(500).json({ success: false, message: err?.message || String(err) });
+    }
+  });
+
   // --- Direct MySQL Database Query Endpoint ---
   app.post(['/api/query', '/hktt/query.php'], async (req, res) => {
     const sql = req.body?.sql || req.query?.sql;
