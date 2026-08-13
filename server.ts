@@ -620,11 +620,11 @@ async function checkAndRevokeOverdueLeads() {
     if (!Array.isArray(rows) || rows.length === 0) return;
 
     const nowTime = Date.now();
-    const TEN_MINUTES_MS = 10 * 60 * 1000;
+    const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 
     for (const lead of rows) {
       const assignedTime = new Date(lead.assignedAt).getTime();
-      if (!isNaN(assignedTime) && (nowTime - assignedTime) >= TEN_MINUTES_MS) {
+      if (!isNaN(assignedTime) && (nowTime - assignedTime) >= THIRTY_MINUTES_MS) {
         const revokedEmail = lead.assignedToEmail;
         const assignerEmail = lead.assignedByEmail || lead.creatorEmail;
         const customerName = lead.customerName || 'Khách hàng';
@@ -649,7 +649,7 @@ async function checkAndRevokeOverdueLeads() {
           [JSON.stringify(historyList), nowIso, 'system_auto_revoke', lead.id]
         );
 
-        console.log(`[Auto-Revoke Cron] Revoked lead ${lead.id} (${customerName}) from ${revokedEmail} due to 10-minute timeout.`);
+        console.log(`[Auto-Revoke Cron] Revoked lead ${lead.id} (${customerName}) from ${revokedEmail} due to 30-minute timeout.`);
 
         // Send FCM Push Notifications (no Zalo on revoke - only on assignment)
         try {
@@ -664,11 +664,11 @@ async function checkAndRevokeOverdueLeads() {
                 token: tItem.token,
                 notification: {
                   title: 'Thu hồi khách hàng ⚠️',
-                  body: `Khách hàng ${customerName} đã bị thu hồi do quá 10 phút không cập nhật thông tin.`
+                  body: `Khách hàng ${customerName} đã bị thu hồi do quá 30 phút không cập nhật thông tin.`
                 },
                 data: {
                   title: 'Thu hồi khách hàng ⚠️',
-                  body: `Khách hàng ${customerName} đã bị thu hồi do quá 10 phút không cập nhật thông tin.`
+                  body: `Khách hàng ${customerName} đã bị thu hồi do quá 30 phút không cập nhật thông tin.`
                 }
               }).catch(() => {});
             }
@@ -681,11 +681,11 @@ async function checkAndRevokeOverdueLeads() {
                   token: aItem.token,
                   notification: {
                     title: 'Khách hàng bị thu hồi - Cần chia lại 🔄',
-                    body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 10 phút. Vui lòng vào phân công lại.`
+                    body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 30 phút. Vui lòng vào phân công lại.`
                   },
                   data: {
                     title: 'Khách hàng bị thu hồi - Cần chia lại 🔄',
-                    body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 10 phút. Vui lòng vào phân công lại.`
+                    body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 30 phút. Vui lòng vào phân công lại.`
                   }
                 }).catch(() => {});
               }

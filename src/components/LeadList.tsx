@@ -78,7 +78,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   // Status Update Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusForm, setStatusForm] = useState({
-    status: 'Chưa liên hệ',
+    status: '',
     subStatus: '',
     appointmentStatus: '',
     resultStatus: '',
@@ -88,8 +88,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const handleOpenStatusModal = () => {
     if (!selectedLead) return;
+    const initialStatus = (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') ? selectedLead.status : '';
     setStatusForm({
-      status: selectedLead.status || 'Chưa liên hệ',
+      status: initialStatus,
       subStatus: selectedLead.subStatus || '',
       appointmentStatus: selectedLead.appointmentStatus || '',
       resultStatus: selectedLead.resultStatus || '',
@@ -100,9 +101,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const isStatusFormValid = () => {
     if (!statusForm.status) return false;
-    if (statusForm.status === 'Chưa liên hệ') {
-      return true;
-    }
     if (statusForm.status === 'Không liên hệ được') {
       return Boolean(statusForm.subStatus);
     }
@@ -1557,18 +1555,18 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </div>
                 </section>
 
-                {/* 10-Minute Lead Update Countdown Banner */}
+                {/* 30-Minute Lead Update Countdown Banner */}
                 {(() => {
                   if (!selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee || !selectedLead.assignedAt) return null;
                   const assignedTime = new Date(selectedLead.assignedAt).getTime();
                   if (isNaN(assignedTime)) return null;
 
                   const elapsedSec = Math.floor((Date.now() - assignedTime) / 1000);
-                  const remainingSec = Math.max(0, 10 * 60 - elapsedSec);
+                  const remainingSec = Math.max(0, 30 * 60 - elapsedSec);
                   const mins = Math.floor(remainingSec / 60);
                   const secs = remainingSec % 60;
                   const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                  const isDanger = remainingSec <= 120;
+                  const isDanger = remainingSec <= 300;
 
                   return (
                     <div className={`p-4 rounded-2xl border flex items-center justify-between mb-6 ${
@@ -1578,7 +1576,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         <Clock className={`w-5 h-5 ${isDanger ? 'text-rose-600' : 'text-amber-600'}`} />
                         <div>
                           <p className="font-bold text-sm">Hạn cập nhật thông tin khách hàng</p>
-                          <p className="text-xs opacity-90">Vui lòng cập nhật thông tin trong <strong className="font-mono font-bold text-amber-950">{formatted}</strong> phút</p>
                         </div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
@@ -1868,7 +1865,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs text-sm"
                 >
-                  <option value="Chưa liên hệ">Chưa liên hệ</option>
+                  <option value="">-- Vui lòng chọn trạng thái --</option>
                   <option value="Không liên hệ được">Không liên hệ được</option>
                   <option value="Đã liên hệ">Đã liên hệ</option>
                 </select>
