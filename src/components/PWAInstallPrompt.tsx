@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Share, PlusSquare, X, Smartphone } from 'lucide-react';
+import { Download, Share, PlusSquare, X, Smartphone, CheckCircle2 } from 'lucide-react';
 
 const SHOW_PWA_PROMPT: number = 1; // 1 bật, 0 tắt
 
@@ -9,6 +9,7 @@ export const PWAInstallPrompt: React.FC = () => {
   const [platform, setPlatform] = useState<'android' | 'ios' | 'other'>('other');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
     if (SHOW_PWA_PROMPT === 0) return;
@@ -41,12 +42,18 @@ export const PWAInstallPrompt: React.FC = () => {
       }
     };
 
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('pwa-install-available', handlePwaAvailable);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('pwa-install-available', handlePwaAvailable);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -59,7 +66,7 @@ export const PWAInstallPrompt: React.FC = () => {
         if (choice?.outcome === 'accepted') {
           (window as any).deferredPrompt = null;
           setDeferredPrompt(null);
-          setShowPrompt(false);
+          setIsInstalled(true);
         }
       } catch (e) {
         setShowGuide(true);
@@ -82,6 +89,42 @@ export const PWAInstallPrompt: React.FC = () => {
   );
 
   if (isStandalone || !showPrompt || (!isMobileDevice && !deferredPrompt)) return null;
+
+  if (isInstalled) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[99999] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 text-center overflow-y-auto"
+        >
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-8 border border-slate-200 relative overflow-hidden my-auto">
+            <div className="absolute top-0 left-0 w-full h-2 bg-emerald-600"></div>
+
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-inner">
+              <CheckCircle2 className="text-emerald-600 w-8 h-8 sm:w-10 sm:h-10" />
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Đã khởi tạo cài đặt! 🚀</h2>
+            <p className="text-xs sm:text-sm text-slate-600 mb-6 leading-relaxed">
+              Vui lòng <strong>thoát khỏi trình duyệt web này</strong> và mở biểu tượng <strong>HKTT CRM</strong> trên màn hình chính điện thoại của bạn để đăng nhập và sử dụng.
+            </p>
+
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-900 text-xs text-center font-medium leading-relaxed">
+              💡 Màn hình đăng nhập chỉ mở khi bạn bấm vào biểu tượng App ở Màn hình chính điện thoại!
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100">
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                SalesPro CRM • Phiên bản di động
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>

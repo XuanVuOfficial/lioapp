@@ -213,13 +213,24 @@ export default function App() {
     );
   }
 
+  const isStandalone = typeof window !== 'undefined' && (
+    window.matchMedia('(display-mode: standalone)').matches || 
+    (navigator as any).standalone === true ||
+    document.referrer.includes('android-app://')
+  );
+
+  const isMobileDevice = typeof window !== 'undefined' && (
+    /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase()) ||
+    window.innerWidth < 768
+  );
+
+  // Mandatory mobile PWA enforcement: Mobile browser MUST install app and cannot use web browser for login
+  if (isMobileDevice && !isStandalone) {
+    return <PWAInstallPrompt />;
+  }
+
   if (!user) {
-    return (
-      <>
-        <Auth onLogin={setUser} />
-        <PWAInstallPrompt />
-      </>
-    );
+    return <Auth onLogin={setUser} />;
   }
 
   const renderContent = () => {
