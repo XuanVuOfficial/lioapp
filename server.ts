@@ -541,10 +541,12 @@ async function startServer() {
 
 async function checkAndRevokeOverdueLeads() {
   try {
-    // 1. Ensure assignedAt & isUpdatedByAssignee columns exist in MySQL leads table
+    // 1. Ensure columns exist in MySQL tables
     await dbPool.query(`
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS assignedAt VARCHAR(50);
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS isUpdatedByAssignee TINYINT(1) DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS useridzalo VARCHAR(255);
     `).catch(() => {});
 
     // 2. Find leads assigned > 10 minutes ago where isUpdatedByAssignee is false/0

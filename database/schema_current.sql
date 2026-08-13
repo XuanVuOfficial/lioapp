@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
     updatedAt BIGINT,
     avatarUrl TEXT,
     mustChangePassword BOOLEAN DEFAULT FALSE,
-    hireDate VARCHAR(50)
+    hireDate VARCHAR(50),
+    phone VARCHAR(50),
+    useridzalo VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS departments (

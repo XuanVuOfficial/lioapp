@@ -18,6 +18,8 @@ export interface UserProfile {
   avatarUrl?: string;
   mustChangePassword?: boolean;
   hireDate?: string;
+  phone?: string;
+  useridzalo?: string;
 }
 
 export interface Department {

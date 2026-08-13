@@ -20,10 +20,18 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const [infoUser, setInfoUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isCheckingZalo, setIsCheckingZalo] = useState(false);
+  const [zaloPreviewData, setZaloPreviewData] = useState<{
+    useridzalo: string;
+    zalo_name: string;
+    avatar: string;
+  } | null>(null);
+
   const [newUser, setNewUser] = useState({
     email: '',
     displayName: '',
     password: '',
+    phone: '',
     role: 'staff' as UserRole,
     departmentId: '',
     avatarUrl: '',
@@ -80,9 +88,9 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     }
   };
 
-  const handleCreate = async () => {
-    if (!newUser.email || !newUser.displayName || !newUser.password) {
-      alert('Vui lòng điền đầy đủ thông tin và mật khẩu');
+  const handleCheckZalo = async () => {
+    if (!newUser.email || !newUser.displayName || !newUser.password || !newUser.phone) {
+      alert('Vui lòng điền đầy đủ Họ tên, Email, Mật khẩu và Số điện thoại');
       return;
     }
 
@@ -101,7 +109,41 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       alert(`Vui lòng chọn ${deptName} cho nhân viên`);
       return;
     }
-    
+
+    const cleanPhone = newUser.phone.trim();
+    if (cleanPhone.length < 9) {
+      alert('Vui lòng nhập Số điện thoại hợp lệ.');
+      return;
+    }
+
+    setIsCheckingZalo(true);
+    try {
+      const res = await fetch(`https://n8n.thienlong.pro.vn/webhook/zalo-user?phone=${encodeURIComponent(cleanPhone)}`);
+      if (!res.ok) {
+        alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
+        setIsCheckingZalo(false);
+        return;
+      }
+      const data = await res.json();
+      if (data && (data.useridzalo || data.zalo_name)) {
+        setZaloPreviewData({
+          useridzalo: String(data.useridzalo || ''),
+          zalo_name: String(data.zalo_name || newUser.displayName),
+          avatar: String(data.avatar || newUser.avatarUrl || '')
+        });
+      } else {
+        alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
+      }
+    } catch (err) {
+      console.error('Error checking Zalo user:', err);
+      alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
+    } finally {
+      setIsCheckingZalo(false);
+    }
+  };
+
+  const handleConfirmCreateWithZalo = async () => {
+    if (!zaloPreviewData) return;
     setIsLoading(true);
     try {
       const settings = await getAppSettings();
@@ -123,9 +165,11 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         createdAt: Date.now(),
         createdBy: currentUser.email,
         updatedAt: Date.now(),
-        avatarUrl: newUser.avatarUrl || undefined,
+        avatarUrl: newUser.avatarUrl || zaloPreviewData.avatar || undefined,
         mustChangePassword: true,
-        hireDate: newUser.hireDate || undefined
+        hireDate: newUser.hireDate || undefined,
+        phone: newUser.phone.trim(),
+        useridzalo: zaloPreviewData.useridzalo
       }, newUser.password);
       
       // If a management role was assigned, update the department's manager info
@@ -136,11 +180,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         });
       }
 
+      setZaloPreviewData(null);
       setShowAddModal(false);
-      setNewUser({ email: '', displayName: '', password: '', role: 'staff', departmentId: '', avatarUrl: '', hireDate: '' });
+      setNewUser({ email: '', displayName: '', password: '', phone: '', role: 'staff', departmentId: '', avatarUrl: '', hireDate: '' });
       setSelectedFloorId('');
-    } catch (error: any) {
-      alert('Lỗi khi tạo tài khoản: ' + error.message);
+    } catch (err: any) {
+      alert('Lỗi tạo nhân viên: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -588,6 +633,16 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại Zalo *</label>
+                  <input 
+                    type="text" 
+                    value={newUser.phone}
+                    onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    placeholder="vd: 0912345678"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu truy cập *</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -658,7 +713,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                 )}
 
                 {/* Phòng Selection */}
-                {['staff', 'tp'].includes(newUser.role) && selectedFloorId && (
+                {['staff', 'tp'].includes(newUser.role) && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Thuộc phòng</label>
                     <select 
@@ -717,14 +772,14 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   Hủy
                 </button>
                 <button 
-                  onClick={handleCreate}
-                  disabled={isLoading}
-                  className="flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={handleCheckZalo}
+                  disabled={isCheckingZalo}
+                  className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-lg shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isLoading ? (
+                  {isCheckingZalo ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : null}
-                  Tạo
+                  Kiểm tra
                 </button>
               </div>
             </motion.div>

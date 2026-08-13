@@ -15,6 +15,7 @@ import { Settings } from './components/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Loader2 } from 'lucide-react';
+import { MandatoryZaloModal } from './components/MandatoryZaloModal';
 import { AppSettings, subscribeToSettings } from './services/settingsService';
 import { registerNotifications } from './services/notificationService';
 
@@ -253,6 +254,12 @@ export default function App() {
       >
         {renderContent()}
       </Layout>
+      {effectiveUser && (
+        <MandatoryZaloModal 
+          user={effectiveUser} 
+          onUpdateSuccess={(updatedUser) => setUser(updatedUser)} 
+        />
+      )}
       <PWAInstallPrompt />
       <div 
         className="fixed bottom-1 right-2 z-50 pointer-events-none select-none text-[10px] font-mono text-slate-400 opacity-40 hover:opacity-100 transition-opacity bg-slate-900/10 dark:bg-slate-900/30 px-1.5 py-0.5 rounded backdrop-blur-xs"
