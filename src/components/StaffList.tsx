@@ -21,6 +21,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isCheckingZalo, setIsCheckingZalo] = useState(false);
+  const [isCheckingZaloEdit, setIsCheckingZaloEdit] = useState(false);
   const [zaloPreviewData, setZaloPreviewData] = useState<{
     useridzalo: string;
     zalo_name: string;
@@ -191,6 +192,44 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     }
   };
 
+  const handleCheckZaloEdit = async () => {
+    if (!editingUser || !editingUser.phone) {
+      alert('Vui lòng nhập Số điện thoại');
+      return;
+    }
+    const cleanPhone = editingUser.phone.trim();
+    if (cleanPhone.length < 9) {
+      alert('Vui lòng nhập Số điện thoại hợp lệ.');
+      return;
+    }
+
+    setIsCheckingZaloEdit(true);
+    try {
+      const res = await fetch(`https://n8n.thienlong.pro.vn/webhook/zalo-user?phone=${encodeURIComponent(cleanPhone)}`);
+      if (!res.ok) {
+        alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
+        setIsCheckingZaloEdit(false);
+        return;
+      }
+      const data = await res.json();
+      if (data && (data.useridzalo || data.zalo_name)) {
+        setEditingUser(prev => prev ? ({ 
+          ...prev, 
+          useridzalo: String(data.useridzalo || ''),
+          avatarUrl: prev.avatarUrl || data.avatar || undefined
+        }) : null);
+        alert(`Đã liên kết Zalo thành công!\n- Tên Zalo: ${data.zalo_name || ''}\n- ID Zalo: ${data.useridzalo || ''}`);
+      } else {
+        alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
+      }
+    } catch (err) {
+      console.error('Error checking Zalo user edit:', err);
+      alert('Vui lòng mở tìm kiếm SĐT trên Zalo, hoặc kiểm tra lại SĐT nha');
+    } finally {
+      setIsCheckingZaloEdit(false);
+    }
+  };
+
   const handleUpdate = async () => {
     if (!editingUser) return;
     
@@ -221,7 +260,9 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         departmentId: editingUser.departmentId || undefined,
         updatedAt: Date.now(),
         avatarUrl: editingUser.avatarUrl || undefined,
-        hireDate: editingUser.hireDate || undefined
+        hireDate: editingUser.hireDate || undefined,
+        phone: editingUser.phone ? editingUser.phone.trim() : undefined,
+        useridzalo: editingUser.useridzalo || undefined
       };
       if (editingUser.password) {
         updates.password = editingUser.password;
@@ -838,6 +879,38 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     placeholder="vd: Nguyễn Văn A"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại Zalo</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={editingUser.phone || ''}
+                      onChange={e => setEditingUser(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
+                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
+                      placeholder="vd: 0912345678"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCheckZaloEdit}
+                      disabled={isCheckingZaloEdit || !editingUser.phone}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs transition-all shadow-sm shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isCheckingZaloEdit ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Search className="w-3.5 h-3.5" />
+                      )}
+                      Kiểm tra Zalo
+                    </button>
+                  </div>
+                  {editingUser.useridzalo ? (
+                    <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Đã liên kết Zalo ID: {editingUser.useridzalo}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 mt-1">Chưa liên kết ID Zalo. Bấm kiểm tra để liên kết.</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu mới (bỏ trống nếu không đổi)</label>
