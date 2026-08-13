@@ -102,6 +102,7 @@ export const registerNotifications = async (email: string, forceRegister: boolea
           body: payload.notification.body || '',
           icon: 'https://thienlong.pro.vn/icon.jpg',
           badge: 'https://thienlong.pro.vn/icon.jpg',
+          tag: payload.data?.tag || payload.data?.id || title || 'lioapp-push',
           data: payload.data || {}
         };
         

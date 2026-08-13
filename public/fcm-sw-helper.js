@@ -47,6 +47,7 @@ self.addEventListener('push', (event) => {
     body: body,
     icon: icon,
     badge: badge,
+    tag: customData.tag || customData.id || title || 'lioapp-push',
     vibrate: [200, 100, 200],
     requireInteraction: true,
     data: {

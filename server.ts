@@ -327,6 +327,15 @@ async function startServer() {
         ? allTokens
         : allTokens.filter(t => recipientEmails.includes(t.email));
 
+      // Deduplicate targetTokens by token string so 1 physical token is never called twice
+      const uniqueTokensMap = new Map<string, UserFcmToken>();
+      for (const t of targetTokens) {
+        if (t.token) {
+          uniqueTokensMap.set(t.token, t);
+        }
+      }
+      targetTokens = Array.from(uniqueTokensMap.values());
+
       if (targetTokens.length === 0) {
         return res.json({
           success: true,
@@ -346,9 +355,11 @@ async function startServer() {
       }
 
       const rawData = input.data || {};
+      const notificationTag = 'lioapp-' + (rawData.tag || rawData.id || Date.now());
       const formattedData: Record<string, string> = {
         title: String(title),
         body: String(body),
+        tag: notificationTag,
       };
 
       if (typeof rawData === 'object' && rawData !== null) {
@@ -384,6 +395,7 @@ async function startServer() {
                 body: String(body),
                 icon: 'https://thienlong.pro.vn/icon.jpg',
                 badge: 'https://thienlong.pro.vn/icon.jpg',
+                tag: notificationTag,
                 requireInteraction: true,
               },
               fcmOptions: {
