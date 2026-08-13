@@ -111,21 +111,6 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
   if (setClause) {
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
-
-  // Fire-and-forget: notify assigned salesperson of the lead update if updated by someone else
-  if (assignedEmail && assignedEmail !== userEmail) {
-    const _email = assignedEmail;
-    const _name = customerName;
-    const _by = userEmail;
-    Promise.resolve().then(async () => {
-      try {
-        const { sendPushNotification } = await import('./notificationService');
-        sendPushNotification(_email, 'Cập nhật thông tin khách hàng ✍️', `Khách hàng ${_name || 'của bạn'} vừa được cập nhật bởi ${_by}`).catch(() => {});
-      } catch (err) {
-        console.error('Error sending push notification on updateLead:', err);
-      }
-    });
-  }
 };
 
 export const assignLead = async (id: string, assignedToEmail: string | undefined, departmentId: string | undefined, userEmail: string): Promise<void> => {
