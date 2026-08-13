@@ -500,7 +500,9 @@ export const subscribeToLeadChanges = (
       const res = await queryDB(pingSql);
       if (isMounted && Array.isArray(res) && res.length > 0) {
         const currentState = `${res[0].total || 0}_${res[0].maxUpdated || ''}`;
-        if (currentState !== lastPingState) {
+        if (!lastPingState) {
+          lastPingState = currentState;
+        } else if (currentState !== lastPingState) {
           lastPingState = currentState;
           onChange();
         }
@@ -510,7 +512,7 @@ export const subscribeToLeadChanges = (
     }
   };
 
-  pingCheck();
+  // Only run interval pinging, do not fire immediately to prevent duplicate queries on tab changes
   const interval = setInterval(pingCheck, intervalMs);
 
   return () => {

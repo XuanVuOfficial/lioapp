@@ -275,6 +275,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     loadTabLeads();
   }, [loadTabLeads]);
 
+  const activeSubDeptIdsKey = React.useMemo(() => {
+    return activeSubDeptIds.sort().join(',');
+  }, [activeSubDeptIds]);
+
   const refreshLeadsAndStats = React.useCallback(() => {
     loadTabLeads();
     if (showStats) {
@@ -282,13 +286,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     }
   }, [loadTabLeads, loadStats, showStats]);
 
-  // Realtime subscription ping
+  const refreshRef = React.useRef(refreshLeadsAndStats);
   useEffect(() => {
-    const unsub = subscribeToLeadChanges(user.role, user.email, activeSubDeptIds, () => {
-      refreshLeadsAndStats();
+    refreshRef.current = refreshLeadsAndStats;
+  }, [refreshLeadsAndStats]);
+
+  // Realtime subscription ping (Stable listener - NEVER unmounts/remounts on tab switch)
+  useEffect(() => {
+    const deptIds = activeSubDeptIdsKey ? activeSubDeptIdsKey.split(',') : undefined;
+    const unsub = subscribeToLeadChanges(user.role, user.email, deptIds, () => {
+      refreshRef.current();
     });
     return () => unsub();
-  }, [user.role, user.email, activeSubDeptIds, refreshLeadsAndStats]);
+  }, [user.role, user.email, activeSubDeptIdsKey]);
 
   // Load next 20 items on scroll
   const loadNextPage = React.useCallback(async () => {
