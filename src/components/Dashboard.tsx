@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Users, UserPlus, TrendingUp, CheckCircle, Clock, AlertCircle, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react';
 import { Lead, Department, UserProfile } from '../types';
-import { fetchDashboardData, DashboardData } from '../services/leadService';
+import { fetchDashboardData, DashboardData, subscribeToLeadChanges } from '../services/leadService';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line 
@@ -19,20 +19,33 @@ const COLORS = ['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6'
 export const Dashboard: React.FC<Props> = ({ leads, departments, user }) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const deptIdsKey = useMemo(() => {
+    return (user.managedDeptIds || []).slice().sort().join(',');
+  }, [user.managedDeptIds]);
+
+  const loadData = useCallback(() => {
+    const departmentIds = deptIdsKey ? deptIdsKey.split(',') : undefined;
     fetchDashboardData({
       role: user.role,
       userEmail: user.email,
-      departmentIds: user.managedDeptIds
+      departmentIds
     }).then(res => {
-      if (isMounted) {
-        setDashboardData(res);
-      }
+      setDashboardData(res);
     }).catch(e => console.error('fetchDashboardData error', e));
+  }, [user.role, user.email, deptIdsKey]);
 
-    return () => { isMounted = false; };
-  }, [user.role, user.email, user.managedDeptIds]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Realtime ping check for Dashboard (Runs every 5s, re-fetches dashboardData on changes)
+  useEffect(() => {
+    const departmentIds = deptIdsKey ? deptIdsKey.split(',') : undefined;
+    const unsub = subscribeToLeadChanges(user.role, user.email, departmentIds, () => {
+      loadData();
+    });
+    return () => unsub();
+  }, [user.role, user.email, deptIdsKey, loadData]);
 
   const statsSummary = dashboardData?.statsSummary;
   const recentLeads = dashboardData?.recentLeads || leads.slice(0, 5);

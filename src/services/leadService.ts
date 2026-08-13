@@ -299,39 +299,27 @@ export const fetchLeadStats = async (
 ): Promise<LeadStatsSummary> => {
   const whereClause = buildBaseWhereClause(options, false);
 
-  const sqlGroup = `
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+  // Combined single SQL query for both stats summary & 7 days daily counts
+  const sqlCombined = `
     SELECT 
       status, 
       subStatus, 
       resultStatus, 
       projectId, 
       departmentId, 
+      DATE(createdAt) as dateStr,
       COUNT(*) as count 
     FROM leads 
     ${whereClause} 
-    GROUP BY status, subStatus, resultStatus, projectId, departmentId
-  `;
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
-
-  const dateWhere = whereClause 
-    ? `${whereClause} AND createdAt >= ${escapeSQL(sevenDaysAgoStr)}`
-    : `WHERE createdAt >= ${escapeSQL(sevenDaysAgoStr)}`;
-
-  const sqlDaily = `
-    SELECT DATE(createdAt) as dateStr, COUNT(*) as count 
-    FROM leads 
-    ${dateWhere} 
-    GROUP BY DATE(createdAt)
+    GROUP BY status, subStatus, resultStatus, projectId, departmentId, DATE(createdAt)
   `;
 
   try {
-    const [groupData, dailyData] = await Promise.all([
-      queryDB(sqlGroup),
-      queryDB(sqlDaily).catch(() => [])
-    ]);
+    const groupData = await queryDB(sqlCombined);
 
     let total = 0;
     const statusCounts: Record<string, number> = {
@@ -354,26 +342,22 @@ export const fetchLeadStats = async (
     };
     const projectCounts: Record<string, number> = {};
     const deptCounts: Record<string, number> = {};
+    const dailyMap: Record<string, number> = {};
 
     if (Array.isArray(groupData)) {
       for (const row of groupData) {
         const c = Number(row.count) || 0;
         total += c;
 
-        if (row.status) {
-          statusCounts[row.status] = (statusCounts[row.status] || 0) + c;
-        }
-        if (row.resultStatus) {
-          resultCounts[row.resultStatus] = (resultCounts[row.resultStatus] || 0) + c;
-        }
-        if (row.subStatus) {
-          subStatusCounts[row.subStatus] = (subStatusCounts[row.subStatus] || 0) + c;
-        }
-        if (row.projectId) {
-          projectCounts[row.projectId] = (projectCounts[row.projectId] || 0) + c;
-        }
-        if (row.departmentId) {
-          deptCounts[row.departmentId] = (deptCounts[row.departmentId] || 0) + c;
+        if (row.status) statusCounts[row.status] = (statusCounts[row.status] || 0) + c;
+        if (row.resultStatus) resultCounts[row.resultStatus] = (resultCounts[row.resultStatus] || 0) + c;
+        if (row.subStatus) subStatusCounts[row.subStatus] = (subStatusCounts[row.subStatus] || 0) + c;
+        if (row.projectId) projectCounts[row.projectId] = (projectCounts[row.projectId] || 0) + c;
+        if (row.departmentId) deptCounts[row.departmentId] = (deptCounts[row.departmentId] || 0) + c;
+
+        const dStr = row.dateStr ? String(row.dateStr).substring(0, 10) : '';
+        if (dStr && dStr >= sevenDaysAgoStr) {
+          dailyMap[dStr] = (dailyMap[dStr] || 0) + c;
         }
       }
     }
@@ -384,16 +368,6 @@ export const fetchLeadStats = async (
       d.setDate(d.getDate() - (6 - i));
       return d.toISOString().split('T')[0];
     });
-
-    const dailyMap: Record<string, number> = {};
-    if (Array.isArray(dailyData)) {
-      for (const row of dailyData) {
-        const dStr = row.dateStr ? String(row.dateStr).substring(0, 10) : '';
-        if (dStr) {
-          dailyMap[dStr] = Number(row.count) || 0;
-        }
-      }
-    }
 
     const dailyCounts = last7DaysDates.map(dStr => ({
       date: dStr.split('-').slice(1).reverse().join('/'),
