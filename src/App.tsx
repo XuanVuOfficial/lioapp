@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Department, Lead, UserRole } from './types';
 import { getUserProfile, createUserProfile, subscribeToUsersByDepartment, getUserProfileByEmail, subscribeToAllUsers } from './services/userService';
 import { subscribeToDepartments } from './services/departmentService';
-import { subscribeToLeads } from './services/leadService';
+import { subscribeToLeads, fetchLeadStats, LeadStatsSummary } from './services/leadService';
 import { Layout } from './components/Layout';
 import { subscribeToMutations } from './api';
 import { Auth } from './components/Auth';
