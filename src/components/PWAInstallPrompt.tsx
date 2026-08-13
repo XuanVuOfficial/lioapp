@@ -71,7 +71,7 @@ export const PWAInstallPrompt: React.FC = () => {
 
   // Check if standalone PWA mode
   const isStandalone = typeof window !== 'undefined' && (
-    window.matchMedia('(display-mode: standalone)').matches || 
+    window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as any).standalone === true ||
     document.referrer.includes('android-app://')
   );
@@ -98,59 +98,52 @@ export const PWAInstallPrompt: React.FC = () => {
             <Smartphone className="text-emerald-600 w-8 h-8 sm:w-10 sm:h-10" />
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Cài đặt ứng dụng trước</h2>
-          <p className="text-xs sm:text-sm text-slate-600 mb-6 leading-relaxed">
-            Để sử dụng mượt mà full màn hình và nhận thông báo đẩy tức thì, vui lòng cài đặt ứng dụng <strong>HKTT CRM</strong> lên màn hình chính.
-          </p>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Cài đặt ứng dụng 📱</h2>
 
-          <div className="space-y-4 text-left">
-            {platform === 'android' || platform === 'other' ? (
-              <div className="space-y-3">
-                <button
-                  onClick={handleInstallClick}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-3.5 px-5 rounded-2xl transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-100 text-sm active:scale-95"
-                >
-                  <Download className="w-4.5 h-4.5" />
-                  Cài đặt ứng dụng ngay
-                </button>
+          <div className="space-y-4 text-left">            {platform === 'android' || platform === 'other' ? (
+            <div className="space-y-3">
+              <button
+                onClick={handleInstallClick}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-3.5 px-5 rounded-2xl transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-100 text-sm active:scale-95"
+              >
+                <Download className="w-4.5 h-4.5" />
+                Cài đặt ứng dụng ngay
+              </button>
 
-                {showGuide && (
-                  <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-amber-900 text-xs space-y-1.5 animate-in fade-in duration-200">
-                    <p className="font-bold text-amber-950">Hướng dẫn cài thủ công trên Chrome:</p>
-                    <p>1. Bấm vào biểu tượng <strong>Menu (⋮)</strong> góc trên bên phải.</p>
-                    <p>2. Chọn <strong>"Thêm vào màn hình chính"</strong> hoặc <strong>"Cài đặt ứng dụng"</strong>.</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="bg-blue-500 p-2 rounded-lg shrink-0 text-white">
-                    <Share className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900 text-xs">Bước 1</p>
-                    <p className="text-slate-600 text-[11px]">Bấm nút <strong>Chia sẻ (Share)</strong> ở góc dưới Safari</p>
-                  </div>
+              {showGuide && (
+                <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-amber-900 text-xs space-y-1.5 animate-in fade-in duration-200">
+                  <p className="font-bold text-amber-950">Hướng dẫn cài thủ công trên Chrome:</p>
+                  <p>1. Bấm vào biểu tượng <strong>Menu (⋮)</strong> góc trên bên phải.</p>
+                  <p>2. Chọn <strong>"Thêm vào màn hình chính"</strong> hoặc <strong>"Cài đặt ứng dụng"</strong>.</p>
                 </div>
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="bg-slate-700 p-2 rounded-lg shrink-0 text-white">
-                    <PlusSquare className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900 text-xs">Bước 2</p>
-                    <p className="text-slate-600 text-[11px]">Kéo xuống chọn <strong>Thêm vào MH chính (Add to Home Screen)</strong></p>
-                  </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="bg-blue-500 p-2 rounded-lg shrink-0 text-white">
+                  <Share className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 text-xs">Bước 1</p>
+                  <p className="text-slate-600 text-[11px]">Bấm nút <strong>Chia sẻ (Share)</strong> ở thanh dưới Safari</p>
                 </div>
               </div>
-            )}
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="bg-slate-700 p-2 rounded-lg shrink-0 text-white">
+                  <PlusSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 text-xs">Bước 2</p>
+                  <p className="text-slate-600 text-[11px]">Kéo xuống chọn <strong>Thêm vào MH chính (Add to Home Screen)</strong></p>
+                </div>
+              </div>
+            </div>
+          )}
 
-            <button
-              onClick={() => setShowPrompt(false)}
-              className="w-full py-2.5 text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors border border-slate-200 rounded-xl hover:bg-slate-50"
-            >
-              Tiếp tục đăng nhập trên trình duyệt
-            </button>
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-900 text-xs text-center leading-relaxed">
+              💡 Sau khi thêm xong, mở biểu tượng <strong>HKTT CRM</strong> trên màn hình chính để sử dụng.
+            </div>
           </div>
 
           <div className="mt-6 pt-4 border-t border-slate-100">
