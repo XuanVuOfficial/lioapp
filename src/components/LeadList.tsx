@@ -701,7 +701,15 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Tổng quan dự án</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-slate-50 rounded-xl">
@@ -922,14 +930,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
             <span>Đang tải thêm 20 khách hàng tiếp theo...</span>
-          </div>
-        )}
-      </div>
-    </>
-  )}assName="mt-2 px-5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-all shadow-sm border border-slate-200"
-            >
-              Tải thêm ngay ({filteredLeads.length - visibleCount} khách hàng còn lại)
-            </button>
           </div>
         )}
       </div>
