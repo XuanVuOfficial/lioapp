@@ -760,29 +760,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         <>
           <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
             <div className="flex space-x-1 md:space-x-2 border-b border-slate-200 min-w-max">
-              {statuses.map(status => {
-                const count = status === 'Tất cả' 
-                  ? (statsSummary?.total || 0) 
-                  : (statsSummary?.statusCounts[status] || 0);
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setCurrentTab(status)}
-                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 flex items-center gap-2 ${
-                      currentTab === status
-                        ? 'border-emerald-600 text-emerald-600 font-bold'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    <span>{status}</span>
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${
-                      currentTab === status ? 'bg-emerald-100 text-emerald-700 font-semibold' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+              {statuses.map(status => (
+                <button
+                  key={status}
+                  onClick={() => setCurrentTab(status)}
+                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
+                    currentTab === status
+                      ? 'border-emerald-600 text-emerald-600 font-bold'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
             </div>
           </div>
 

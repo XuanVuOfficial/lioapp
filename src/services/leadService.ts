@@ -432,22 +432,18 @@ export const fetchPaginatedLeads = async (
 
   const whereClause = buildBaseWhereClause(params, true);
 
-  const countSql = `SELECT COUNT(*) as total FROM leads ${whereClause}`;
-  const dataSql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT ${limit} OFFSET ${offset}`;
+  // Single SQL Query: Fetch limit + 1 items to determine hasMore without COUNT(*)
+  const dataSql = `SELECT ${ESSENTIAL_LEAD_COLUMNS} FROM leads ${whereClause} ORDER BY updatedAt DESC LIMIT ${limit + 1} OFFSET ${offset}`;
 
-  const [countRes, dataRes] = await Promise.all([
-    queryDB(countSql),
-    queryDB(dataSql)
-  ]);
+  const dataRes = await queryDB(dataSql);
+  const rawList = (Array.isArray(dataRes) ? dataRes : []).map(parseLead);
 
-  const totalCount = (countRes && countRes[0] && countRes[0].total) ? Number(countRes[0].total) : 0;
-  const leads = (Array.isArray(dataRes) ? dataRes : []).map(parseLead);
-
-  const hasMore = offset + leads.length < totalCount;
+  const hasMore = rawList.length > limit;
+  const leads = hasMore ? rawList.slice(0, limit) : rawList;
 
   return {
     leads,
-    totalCount,
+    totalCount: 0,
     page,
     hasMore
   };
