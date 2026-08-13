@@ -13,6 +13,19 @@ const parseLead = (row: any): Lead => {
   return lead as Lead;
 };
 
+export const sendZaloNotification = async (email: string, message: string) => {
+  if (!email || !message) return;
+  try {
+    await fetch('/api/zalo/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, message })
+    });
+  } catch (err) {
+    console.error('Error sending Zalo notification:', err);
+  }
+};
+
 export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
   const id = generateId();
   const now = new Date().toISOString();
@@ -38,7 +51,7 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
   const vals = Object.values(data).map(v => escapeSQL(v)).join(', ');
   await executeMutation('leads', 'CREATE', newLead, `INSERT INTO leads (${cols}) VALUES (${vals})`);
 
-  // Send push notification to assigned employee
+  // Send push & Zalo notification to assigned employee
   if (newLead.assignedToEmail) {
     try {
       const { sendPushNotification } = await import('./notificationService');
@@ -47,8 +60,10 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
         'Khách hàng mới được giao 💼',
         `Bạn vừa được giao khách hàng ${newLead.customerName} bởi ${newLead.creatorEmail}`
       );
+      const zaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${newLead.customerName}${newLead.phone ? ' - SĐT: ' + newLead.phone : ''}`;
+      await sendZaloNotification(newLead.assignedToEmail, zaloMsg);
     } catch (err) {
-      console.error('Error sending push notification for new lead:', err);
+      console.error('Error sending notification for new lead:', err);
     }
   }
 };
@@ -114,17 +129,19 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
 
 export const assignLead = async (id: string, assignedToEmail: string | undefined, departmentId: string | undefined, userEmail: string): Promise<void> => {
   const now = new Date().toISOString();
-  const dataList = await queryDB(`SELECT customerName, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  const dataList = await queryDB(`SELECT customerName, phone, assignedToEmail, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
   let currentHistory: string[] = [];
   let customerName = 'Khách hàng';
+  let phone = '';
+  let prevAssignedToEmail = '';
 
   if (dataList && dataList.length > 0) {
     if (dataList[0].history) {
       try { currentHistory = typeof dataList[0].history === 'string' ? JSON.parse(dataList[0].history) : dataList[0].history; } catch (e) { }
     }
-    if (dataList[0].customerName) {
-      customerName = dataList[0].customerName;
-    }
+    if (dataList[0].customerName) customerName = dataList[0].customerName;
+    if (dataList[0].phone) phone = dataList[0].phone;
+    if (dataList[0].assignedToEmail) prevAssignedToEmail = dataList[0].assignedToEmail;
   }
 
   const timestamp = new Date(now).toLocaleString('vi-VN');
@@ -155,8 +172,18 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
     await executeMutation('leads', 'UPDATE', { id, ...updateData }, `UPDATE leads SET ${setClause} WHERE id = ${escapeSQL(id)} LIMIT 1`);
   }
 
-  // Notify assigned employee of lead assignment
-  if (assignedToEmail) {
+  // 1. Zalo Notification on Revoke/Reassignment
+  if (prevAssignedToEmail && prevAssignedToEmail.toLowerCase() !== (assignedToEmail || '').toLowerCase()) {
+    try {
+      const revokeZaloMsg = `[HKTT CRM] Khách hàng ${customerName}${phone ? ' (' + phone + ')' : ''} đã bị thu hồi khỏi danh sách quản lý của bạn.`;
+      await sendZaloNotification(prevAssignedToEmail, revokeZaloMsg);
+    } catch (err) {
+      console.error('Error sending Zalo revoke notification:', err);
+    }
+  }
+
+  // 2. Push & Zalo Notification on Assign
+  if (assignedToEmail && assignedToEmail.toLowerCase() !== prevAssignedToEmail.toLowerCase()) {
     try {
       const { sendPushNotification } = await import('./notificationService');
       await sendPushNotification(
@@ -164,8 +191,10 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
         'Khách hàng mới được giao 💼',
         `Bạn vừa được giao khách hàng ${customerName} bởi ${userEmail}`
       );
+      const assignZaloMsg = `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${customerName}${phone ? ' - SĐT: ' + phone : ''}`;
+      await sendZaloNotification(assignedToEmail, assignZaloMsg);
     } catch (err) {
-      console.error('Error sending push notification on assignLead:', err);
+      console.error('Error sending notification on assignLead:', err);
     }
   }
 };

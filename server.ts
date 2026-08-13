@@ -226,6 +226,40 @@ async function deleteFcmTokens(staleIds: string[]) {
   }
 }
 
+const DEFAULT_ZALO_GROUP_ID = '1983318870321097523';
+
+async function sendZaloWebhookNotification(emailOrUserId: string, message: string) {
+  if (!emailOrUserId || !message) return;
+  try {
+    let zaloUserId = emailOrUserId.trim();
+    if (emailOrUserId.includes('@')) {
+      const [rows] = await dbPool.query<mysql.RowDataPacket[]>(
+        'SELECT useridzalo FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+        [emailOrUserId.trim()]
+      );
+      if (Array.isArray(rows) && rows.length > 0 && rows[0].useridzalo) {
+        zaloUserId = String(rows[0].useridzalo).trim();
+      } else {
+        console.log(`[Zalo Webhook] No useridzalo found in MySQL for email: ${emailOrUserId}`);
+        return;
+      }
+    }
+
+    if (!zaloUserId) return;
+
+    const url = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(DEFAULT_ZALO_GROUP_ID)}&userid=${encodeURIComponent(zaloUserId)}&message=${encodeURIComponent(message)}`;
+    console.log(`[Zalo Webhook] Triggering webhook for Zalo User ID: ${zaloUserId}...`);
+    const res = await fetch(url);
+    if (res.ok) {
+      console.log(`[Zalo Webhook] Successfully sent notification to Zalo User ID ${zaloUserId}`);
+    } else {
+      console.warn(`[Zalo Webhook] Failed to send notification to ${zaloUserId}, status: ${res.status}`);
+    }
+  } catch (err: any) {
+    console.error(`[Zalo Webhook] Error sending webhook to Zalo User ID (${emailOrUserId}):`, err?.message || err);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -291,54 +325,7 @@ async function startServer() {
     });
   });
 
-  // Helper to send Zalo Webhook notification via N8N API
-  async function sendZaloWebhookNotification(recipientEmails: string[], title: string, body: string) {
-    const ZALO_GROUP_ID = '1983318870321097523';
-    const fullMessage = `${title}\n${body}`.trim();
-
-    try {
-      let query = 'SELECT email, useridzalo FROM users WHERE useridzalo IS NOT NULL AND useridzalo != ""';
-      let params: any[] = [];
-
-      if (recipientEmails.length > 0 && !recipientEmails.includes('all')) {
-        query += ' AND LOWER(email) IN (' + recipientEmails.map(() => '?').join(',') + ')';
-        params = recipientEmails.map(e => e.toLowerCase());
-      }
-
-      const [rows] = await dbPool.query<mysql.RowDataPacket[]>(query, params);
-
-      if (Array.isArray(rows) && rows.length > 0) {
-        const uniqueZaloUsers = new Set<string>();
-        for (const row of rows) {
-          if (row.useridzalo && String(row.useridzalo).trim()) {
-            uniqueZaloUsers.add(String(row.useridzalo).trim());
-          }
-        }
-
-        for (const useridzalo of uniqueZaloUsers) {
-          const webhookUrl = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(ZALO_GROUP_ID)}&userid=${encodeURIComponent(useridzalo)}&message=${encodeURIComponent(fullMessage)}`;
-          
-          if (typeof fetch !== 'undefined') {
-            fetch(webhookUrl)
-              .then(res => console.log(`[Zalo Webhook] Triggered for useridzalo ${useridzalo}: status ${res.status}`))
-              .catch(err => console.error(`[Zalo Webhook] Error for ${useridzalo}:`, err.message));
-          } else {
-            import('https').then(https => {
-              https.get(webhookUrl, (res) => {
-                console.log(`[Zalo Webhook HTTPS] Triggered for ${useridzalo}: status ${res.statusCode}`);
-              }).on('error', (e) => {
-                console.error(`[Zalo Webhook HTTPS] Error for ${useridzalo}:`, e.message);
-              });
-            }).catch(() => {});
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error('[Zalo Webhook] Error querying user Zalo IDs:', error.message);
-    }
-  }
-
-  // 3. Send Push Notification via Node FCM Admin & Zalo Webhook
+  // 3. Send Push Notification via Node FCM Admin
   app.post('/api/notifications/send', async (req, res) => {
     try {
       const input = req.body || {};
@@ -368,11 +355,6 @@ async function startServer() {
           message: 'Thiếu tiêu đề (title) hoặc nội dung (body) thông báo.',
         });
       }
-
-      // Simultaneously trigger Zalo notification via N8N Webhook API
-      sendZaloWebhookNotification(recipientEmails, title, body).catch(err => {
-        console.error('[Zalo Webhook Async Error]:', err);
-      });
 
       let allTokens = await loadFcmTokens();
       let targetTokens = isSendToAll
@@ -499,6 +481,17 @@ async function startServer() {
         message: 'Lỗi server Node khi gửi thông báo: ' + (error?.message || String(error)),
       });
     }
+  });
+
+  // 4. Send Zalo Webhook Notification Endpoint
+  app.post('/api/zalo/send', async (req, res) => {
+    const { email, useridzalo, message } = req.body || {};
+    const target = useridzalo || email;
+    if (!target || !message) {
+      return res.status(400).json({ success: false, message: 'Thiếu email/useridzalo hoặc message' });
+    }
+    await sendZaloWebhookNotification(target, message);
+    return res.json({ success: true, message: 'Đã gửi webhook Zalo thành công' });
   });
 
   // --- Direct MySQL Database Query Endpoint ---
@@ -657,6 +650,14 @@ async function checkAndRevokeOverdueLeads() {
         );
 
         console.log(`[Auto-Revoke Cron] Revoked lead ${lead.id} (${customerName}) from ${revokedEmail} due to 10-minute timeout.`);
+
+        // Send Zalo Webhook Notification to revoked staff
+        try {
+          const zaloRevokeMsg = `[HKTT CRM] Khách hàng ${customerName}${phone ? ' (' + phone + ')' : ''} đã bị thu hồi do quá 10 phút không cập nhật thông tin.`;
+          await sendZaloWebhookNotification(revokedEmail, zaloRevokeMsg);
+        } catch (zErr) {
+          console.error('[Auto-Revoke Cron] Error sending Zalo webhook notification:', zErr);
+        }
 
         // Send FCM Push Notifications
         try {
