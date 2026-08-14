@@ -16,13 +16,12 @@ try {
 
   messaging.onBackgroundMessage((payload) => {
     console.log('[fcm-sw-helper] Received background message:', payload);
-    const notif = payload.notification || payload.webpush?.notification || {};
-    const pData = payload.data || {};
+    const pData = payload.data || payload.notification || {};
 
-    const title = notif.title || pData.title || 'HKTT CRM';
-    const body = notif.body || pData.body || 'Bạn có thông báo mới!';
-    const icon = notif.icon || pData.icon || 'https://thienlong.pro.vn/icon.jpg';
-    const badge = notif.badge || pData.badge || 'https://thienlong.pro.vn/icon.jpg';
+    const title = pData.title || 'HKTT CRM';
+    const body = pData.body || 'Bạn có thông báo mới!';
+    const icon = pData.icon || 'https://thienlong.pro.vn/icon.jpg';
+    const badge = pData.badge || 'https://thienlong.pro.vn/icon.jpg';
     const tag = pData.tag || pData.id || title || 'lioapp-push';
 
     return self.registration.showNotification(title, {
@@ -30,6 +29,7 @@ try {
       icon: icon,
       badge: badge,
       tag: tag,
+      renotify: false,
       vibrate: [200, 100, 200],
       requireInteraction: true,
       data: {

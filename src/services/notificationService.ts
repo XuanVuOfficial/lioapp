@@ -17,6 +17,8 @@ const REGISTER_TOKEN_ENDPOINT = '/api/notifications/register-token';
 const SEND_NOTIFICATION_ENDPOINT = '/api/notifications/send';
 const VAPID_KEY = "BNphtTRAaQyDZZghboo4RYxGMtP66-O2Fw02PuPrsceXa-UhEz3xz4LA2cMfUCDD9jBGWwYoIf4NTcDSgVTvqRg";
 
+let isForegroundListenerAttached = false;
+
 /**
  * Register user for official Firebase FCM push notifications via Node backend
  */
@@ -93,28 +95,34 @@ export const registerNotifications = async (email: string, forceRegister: boolea
       console.warn('No FCM registration token received.');
     }
 
-    // 5. Handle foreground notification messages from Firebase FCM
-    onMessage(messaging, (payload) => {
-      console.log('Received FCM foreground message:', payload);
-      if (payload.notification) {
-        const title = payload.notification.title || 'HKTT CRM';
-        const options: NotificationOptions = {
-          body: payload.notification.body || '',
-          icon: 'https://thienlong.pro.vn/icon.jpg',
-          badge: 'https://thienlong.pro.vn/icon.jpg',
-          tag: payload.data?.tag || payload.data?.id || title || 'lioapp-push',
-          data: payload.data || {}
-        };
-        
-        if (registration && typeof registration.showNotification === 'function') {
-          registration.showNotification(title, options).catch(() => {
+    // 5. Handle foreground notification messages from Firebase FCM (attached only once)
+    if (!isForegroundListenerAttached && messaging) {
+      isForegroundListenerAttached = true;
+      onMessage(messaging, (payload) => {
+        console.log('Received FCM foreground message:', payload);
+        const pData = payload.data || payload.notification || {};
+        const title = pData.title || 'HKTT CRM';
+        const body = pData.body || '';
+        if (title && body) {
+          const options: NotificationOptions = {
+            body: body,
+            icon: pData.icon || 'https://thienlong.pro.vn/icon.jpg',
+            badge: pData.badge || 'https://thienlong.pro.vn/icon.jpg',
+            tag: pData.tag || pData.id || title || 'lioapp-push',
+            renotify: false,
+            data: pData
+          };
+          
+          if (registration && typeof registration.showNotification === 'function') {
+            registration.showNotification(title, options).catch(() => {
+              new Notification(title, options);
+            });
+          } else {
             new Notification(title, options);
-          });
-        } else {
-          new Notification(title, options);
+          }
         }
-      }
-    });
+      });
+    }
 
   } catch (error) {
     console.error('Error in FCM registerNotifications:', error);

@@ -397,11 +397,16 @@ async function startServer() {
         title: String(title),
         body: String(body),
         tag: notificationTag,
+        icon: 'https://thienlong.pro.vn/icon.jpg',
+        badge: 'https://thienlong.pro.vn/icon.jpg',
+        url: rawData.url || rawData.link || 'https://thienlong.pro.vn',
       };
 
       if (typeof rawData === 'object' && rawData !== null) {
         for (const [k, v] of Object.entries(rawData)) {
-          formattedData[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
+          if (!['title', 'body', 'tag', 'icon', 'badge', 'url'].includes(k)) {
+            formattedData[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
+          }
         }
       }
 
@@ -415,28 +420,17 @@ async function startServer() {
         let errMsg = '';
 
         try {
+          // Data-only payload prevents browser/FCM SDK from generating a duplicate default notification
           const message: Message = {
             token: item.token,
-            notification: {
-              title: String(title),
-              body: String(body),
-            },
             data: formattedData,
             webpush: {
               headers: {
                 Urgency: 'high',
                 TTL: '86400',
               },
-              notification: {
-                title: String(title),
-                body: String(body),
-                icon: 'https://thienlong.pro.vn/icon.jpg',
-                badge: 'https://thienlong.pro.vn/icon.jpg',
-                tag: notificationTag,
-                requireInteraction: true,
-              },
               fcmOptions: {
-                link: formattedData.url || 'https://thienlong.pro.vn',
+                link: formattedData.url,
               },
             },
           };
