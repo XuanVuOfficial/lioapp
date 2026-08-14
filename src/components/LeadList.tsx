@@ -742,16 +742,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const assignableStaff = React.useMemo(() => {
     if (!['tgd', 'admin', 'gds', 'tp'].includes(user.role)) return [];
-    
-    let validDeptIds: string[];
-    if (selectedAssignDeptId) {
-      validDeptIds = getSubDeptIdsRecursive(selectedAssignDeptId);
-    } else {
-      validDeptIds = allowedDepartments.map(d => d.id);
-    }
-    
+    const validDeptIds = allowedDepartments.map(d => d.id);
     return staff.filter(s => s.departmentId && validDeptIds.includes(s.departmentId));
-  }, [staff, selectedAssignDeptId, user.role, getSubDeptIdsRecursive, allowedDepartments]);
+  }, [staff, user.role, allowedDepartments]);
 
   const getRoleName = (role: string) => {
     switch (role) {
@@ -1270,27 +1263,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <div className="space-y-4">
                 {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Chọn nhánh phòng ban cần chia *</label>
-                      <button
-                        type="button"
-                        onClick={() => setSearchPickerModal({ type: 'department', searchTerm: '' })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-left focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300"
-                      >
-                        <span className={selectedAssignDeptId ? "text-slate-900 font-semibold text-sm truncate" : "text-slate-400 text-sm"}>
-                          {selectedAssignDeptId 
-                            ? getDepartmentPath(selectedAssignDeptId) 
-                            : 'Bấm để tìm & chọn phòng ban'}
-                        </span>
-                        <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                      </button>
-                    </div>
+                    {/* 1. Chia cho nhân viên */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Chia cho nhân viên</label>
                       <button
                         type="button"
                         onClick={() => setSearchPickerModal({ type: 'staff', searchTerm: '' })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-left focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-left focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 cursor-pointer shadow-2xs"
                       >
                         <span className={newLead.assignedToEmail ? "text-slate-900 font-semibold text-sm truncate" : "text-slate-400 text-sm"}>
                           {newLead.assignedToEmail 
@@ -1299,6 +1278,39 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         </span>
                         <Search className="w-4 h-4 text-slate-400 shrink-0" />
                       </button>
+                    </div>
+
+                    {/* 2. Chọn nhánh phòng ban cần chia */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Chọn nhánh phòng ban cần chia <span className="text-rose-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={Boolean(newLead.assignedToEmail)}
+                        onClick={() => {
+                          if (!newLead.assignedToEmail) {
+                            setSearchPickerModal({ type: 'department', searchTerm: '' });
+                          }
+                        }}
+                        className={`w-full px-4 py-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                          newLead.assignedToEmail
+                            ? 'bg-slate-100/90 border-slate-200 text-slate-500 cursor-not-allowed opacity-75'
+                            : 'bg-white border-slate-200 hover:border-emerald-300 focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs'
+                        }`}
+                      >
+                        <span className={selectedAssignDeptId ? "text-slate-900 font-medium text-sm truncate" : "text-slate-400 text-sm"}>
+                          {selectedAssignDeptId 
+                            ? getDepartmentPath(selectedAssignDeptId) 
+                            : 'Bấm để tìm & chọn phòng ban'}
+                        </span>
+                        {!newLead.assignedToEmail && <Search className="w-4 h-4 text-slate-400 shrink-0" />}
+                      </button>
+                      {newLead.assignedToEmail && (
+                        <p className="text-[11px] text-slate-400 mt-1 italic">
+                          Tự động điền theo phòng ban của nhân viên đã chọn.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2484,9 +2496,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     type="button"
                     onClick={() => {
                       setNewLead(prev => ({ ...prev, assignedToEmail: '' }));
+                      setSelectedAssignDeptId('');
                       setSearchPickerModal({ type: null, searchTerm: '' });
                     }}
-                    className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
+                    className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
                       !newLead.assignedToEmail ? 'border-amber-500 bg-amber-50 text-amber-900 font-bold' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}
                   >
@@ -2503,15 +2516,23 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                           type="button"
                           onClick={() => {
                             setNewLead(prev => ({ ...prev, assignedToEmail: s.email }));
+                            if (s.departmentId) {
+                              setSelectedAssignDeptId(s.departmentId);
+                            }
                             setSearchPickerModal({ type: null, searchTerm: '' });
                           }}
-                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
+                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
                             isSel ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50 text-slate-700'
                           }`}
                         >
                           <div>
                             <p className="font-semibold text-sm">{s.displayName}</p>
                             <p className="text-xs text-slate-500">{s.email} • {getRoleName(s.role)}</p>
+                            {s.departmentId && (
+                              <p className="text-[11px] text-emerald-600 font-medium mt-0.5">
+                                {getDepartmentPath(s.departmentId)}
+                              </p>
+                            )}
                           </div>
                           {isSel && <Check className="w-4 h-4 text-emerald-600" />}
                         </button>

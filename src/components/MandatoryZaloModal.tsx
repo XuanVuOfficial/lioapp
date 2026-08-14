@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Phone, Check, User, Search, ShieldCheck } from 'lucide-react';
+import { Phone, Check, User, Search, ShieldCheck, Calendar, Clock } from 'lucide-react';
 import { UserProfile } from '../types';
 import { updateUserProfile } from '../services/userService';
 
@@ -11,6 +11,7 @@ interface Props {
 
 export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) => {
   const [phone, setPhone] = useState(user.phone || '');
+  const [hireDate, setHireDate] = useState(user.hireDate || '');
   const [isChecking, setIsChecking] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [zaloPreview, setZaloPreview] = useState<{
@@ -19,15 +20,45 @@ export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) =
     avatar: string;
   } | null>(null);
 
-  // If user already has phone and useridzalo, do not show modal
-  if (user.phone && user.useridzalo) {
+  const isMissingZalo = !user.phone || !user.useridzalo;
+  const isMissingHireDate = !user.hireDate;
+
+  // If user already has phone, useridzalo AND hireDate, do not show modal
+  if (!isMissingZalo && !isMissingHireDate) {
     return null;
   }
+
+  // Handle case where user only needs to update Hire Date (Zalo already verified)
+  const handleSaveHireDateOnly = async () => {
+    const cleanDate = hireDate.trim();
+    if (!cleanDate) {
+      alert('Vui lòng chọn Ngày nhận việc.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const updates = { hireDate: cleanDate };
+      await updateUserProfile(user.uid, updates);
+      onUpdateSuccess({
+        ...user,
+        ...updates
+      });
+    } catch (err: any) {
+      alert('Có lỗi xảy ra khi cập nhật ngày nhận việc: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleCheckZalo = async () => {
     const cleanPhone = phone.trim();
     if (!cleanPhone || cleanPhone.length < 9) {
       alert('Vui lòng nhập Số điện thoại hợp lệ.');
+      return;
+    }
+
+    if (isMissingHireDate && !hireDate.trim()) {
+      alert('Vui lòng chọn Ngày nhận việc của bạn.');
       return;
     }
 
@@ -59,11 +90,16 @@ export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) =
 
   const handleConfirmSave = async () => {
     if (!zaloPreview) return;
+    if (isMissingHireDate && !hireDate.trim()) {
+      alert('Vui lòng chọn Ngày nhận việc.');
+      return;
+    }
     setIsSaving(true);
     try {
-      const updates = {
+      const updates: Partial<UserProfile> = {
         phone: phone.trim(),
-        useridzalo: zaloPreview.useridzalo
+        useridzalo: zaloPreview.useridzalo,
+        ...(isMissingHireDate ? { hireDate: hireDate.trim() } : {})
       };
       await updateUserProfile(user.uid, updates);
       onUpdateSuccess({
@@ -71,12 +107,65 @@ export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) =
         ...updates
       });
     } catch (err: any) {
-      alert('Có lỗi xảy ra khi cập nhật thông tin Zalo: ' + err.message);
+      alert('Có lỗi xảy ra khi cập nhật thông tin: ' + err.message);
     } finally {
       setIsSaving(false);
     }
   };
 
+  // 1. Modal View: Only missing Hire Date (Zalo already verified)
+  if (!isMissingZalo && isMissingHireDate) {
+    return (
+      <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-3xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-100 text-center relative"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-sm">
+            <Calendar className="w-8 h-8" />
+          </div>
+
+          <h3 className="text-xl font-bold text-slate-900 mb-1.5">Cập nhật Ngày nhận việc</h3>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            Xin chào <strong>{user.displayName}</strong>, vui lòng cập nhật ngày nhận việc chính thức của bạn để hoàn tất hồ sơ nhân sự và hệ thống tính thâm niên.
+          </p>
+
+          <div className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Ngày bắt đầu nhận việc <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input 
+                  type="date"
+                  required
+                  value={hireDate}
+                  onChange={e => setHireDate(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium text-slate-800 bg-white"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveHireDateOnly}
+              disabled={isSaving || !hireDate.trim()}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              Xác nhận & Lưu thông tin
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // 2. Modal View: Missing Zalo (and possibly Hire Date)
   return (
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
       <motion.div 
@@ -88,16 +177,16 @@ export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) =
           <ShieldCheck className="w-8 h-8" />
         </div>
 
-        <h3 className="text-xl font-bold text-slate-900 mb-1">Cập nhật Số điện thoại Zalo</h3>
+        <h3 className="text-xl font-bold text-slate-900 mb-1">Cập nhật Thông tin bắt buộc</h3>
         <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-          Vui lòng bổ sung và xác thực Số điện thoại Zalo chính chủ để hoàn tất tài khoản và nhận thông báo công việc.
+          Vui lòng bổ sung Số điện thoại Zalo chính chủ {isMissingHireDate ? 'và Ngày nhận việc ' : ''}để hoàn tất tài khoản và nhận thông báo công việc.
         </p>
 
         {!zaloPreview ? (
           <div className="space-y-4 text-left">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                Số điện thoại Zalo *
+                Số điện thoại Zalo <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -111,10 +200,27 @@ export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) =
               </div>
             </div>
 
+            {isMissingHireDate && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Ngày nhận việc <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type="date"
+                    required
+                    value={hireDate}
+                    onChange={e => setHireDate(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-800 bg-white"
+                  />
+                </div>
+              </div>
+            )}
+
             <button
               onClick={handleCheckZalo}
-              disabled={isChecking || !phone.trim()}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={isChecking || !phone.trim() || (isMissingHireDate && !hireDate.trim())}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {isChecking ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -141,19 +247,24 @@ export const MandatoryZaloModal: React.FC<Props> = ({ user, onUpdateSuccess }) =
               <h4 className="text-lg font-bold text-slate-900">{zaloPreview.zalo_name}</h4>
               <p className="text-xs text-slate-500 font-mono">ID Zalo: {zaloPreview.useridzalo}</p>
               <p className="text-xs text-slate-600 font-semibold mt-1">SĐT: {phone}</p>
+              {hireDate && (
+                <p className="text-xs text-slate-600 font-semibold mt-0.5">
+                  Ngày nhận việc: {new Date(hireDate).toLocaleDateString('vi-VN')}
+                </p>
+              )}
             </div>
 
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setZaloPreview(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 cursor-pointer"
               >
-                Đổi SĐT
+                Đổi thông tin
               </button>
               <button
                 onClick={handleConfirmSave}
                 disabled={isSaving}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSaving ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

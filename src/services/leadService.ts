@@ -461,6 +461,51 @@ export const fetchLeadStats = async (
   }
 };
 
+export interface ProjectStatsSummary {
+  [projectId: string]: {
+    totalLeads: number;
+    contactedLeads: number;
+    closedLeads: number;
+  };
+}
+
+export const fetchProjectStatsSummary = async (
+  role?: UserRole,
+  userEmail?: string,
+  departmentIds?: string[]
+): Promise<ProjectStatsSummary> => {
+  const whereClause = buildBaseWhereClause({ role, userEmail, departmentIds }, false);
+  const sql = `
+    SELECT 
+      projectId,
+      COUNT(*) as totalLeads,
+      SUM(CASE WHEN status = 'Đã liên hệ' THEN 1 ELSE 0 END) as contactedLeads,
+      SUM(CASE WHEN resultStatus IN ('Đã booking', 'Đã cọc') THEN 1 ELSE 0 END) as closedLeads
+    FROM leads
+    ${whereClause}
+    GROUP BY projectId
+  `;
+
+  const result: ProjectStatsSummary = {};
+  try {
+    const data = await queryDB(sql);
+    if (Array.isArray(data)) {
+      for (const row of data) {
+        if (row.projectId) {
+          result[row.projectId] = {
+            totalLeads: Number(row.totalLeads) || 0,
+            contactedLeads: Number(row.contactedLeads) || 0,
+            closedLeads: Number(row.closedLeads) || 0
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.error('fetchProjectStatsSummary error:', err);
+  }
+  return result;
+};
+
 export const fetchPaginatedLeads = async (
   params: FetchPaginatedLeadsParams
 ): Promise<FetchPaginatedLeadsResult> => {

@@ -12,54 +12,35 @@ try {
     appId: "1:469611606338:web:d95dd111e5dfa4d32158db"
   });
 
-  firebase.messaging();
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    console.log('[fcm-sw-helper] Received background message:', payload);
+    const notif = payload.notification || payload.webpush?.notification || {};
+    const pData = payload.data || {};
+
+    const title = notif.title || pData.title || 'HKTT CRM';
+    const body = notif.body || pData.body || 'Bạn có thông báo mới!';
+    const icon = notif.icon || pData.icon || 'https://thienlong.pro.vn/icon.jpg';
+    const badge = notif.badge || pData.badge || 'https://thienlong.pro.vn/icon.jpg';
+    const tag = pData.tag || pData.id || title || 'lioapp-push';
+
+    return self.registration.showNotification(title, {
+      body: body,
+      icon: icon,
+      badge: badge,
+      tag: tag,
+      vibrate: [200, 100, 200],
+      requireInteraction: true,
+      data: {
+        ...pData,
+        url: pData.url || pData.link || 'https://thienlong.pro.vn'
+      }
+    });
+  });
 } catch (e) {
   console.warn('[fcm-sw-helper] Firebase init error:', e);
 }
-
-// Push Event Handler
-self.addEventListener('push', (event) => {
-  let title = 'HKTT CRM';
-  let body = 'Bạn có thông báo mới!';
-  let icon = 'https://thienlong.pro.vn/icon.jpg';
-  let badge = 'https://thienlong.pro.vn/icon.jpg';
-  let url = 'https://thienlong.pro.vn';
-  let customData = {};
-
-  if (event.data) {
-    try {
-      const payload = event.data.json();
-      const notif = payload.notification || payload.webpush?.notification || {};
-      const pData = payload.data || {};
-
-      title = notif.title || pData.title || title;
-      body = notif.body || pData.body || body;
-      icon = notif.icon || pData.icon || icon;
-      badge = notif.badge || pData.badge || badge;
-      url = pData.url || pData.link || payload.webpush?.fcmOptions?.link || url;
-      customData = pData;
-    } catch (e) {
-      body = event.data.text() || body;
-    }
-  }
-
-  const notificationOptions = {
-    body: body,
-    icon: icon,
-    badge: badge,
-    tag: customData.tag || customData.id || title || 'lioapp-push',
-    vibrate: [200, 100, 200],
-    requireInteraction: true,
-    data: {
-      ...customData,
-      url: url
-    }
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(title, notificationOptions)
-  );
-});
 
 // Notification Click Event Handler
 self.addEventListener('notificationclick', (event) => {

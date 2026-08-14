@@ -1,51 +1,91 @@
-import React, { useState, useEffect } from 'react';
-import { Project, UserProfile, Lead } from '../types';
-import { LeadStatsSummary } from '../services/leadService';
-import { queryDB, escapeSQL, subscribeDB, generateId, executeMutation, subscribeToMutations } from '../api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Project, UserProfile, Department } from '../types';
+import { fetchProjectStatsSummary, ProjectStatsSummary } from '../services/leadService';
+import { queryDB, escapeSQL, generateId, executeMutation, subscribeToMutations } from '../api';
 import { Plus, Trash2, FolderKanban, Users, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ProjectListProps {
   user: UserProfile;
-  leads: Lead[];
-  statsSummary?: LeadStatsSummary | null;
+  departments?: Department[];
   onProjectClick?: (projectId: string) => void;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSummary, onProjectClick }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ user, departments = [], onProjectClick }) => {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectStats, setProjectStats] = useState<ProjectStatsSummary>({});
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newAbbreviation, setNewAbbreviation] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-    queryDB('SELECT * FROM projects ORDER BY createdAt DESC LIMIT 100').then((data: any[]) => {
-      if (isMounted && Array.isArray(data)) {
-        setProjects(data as Project[]);
-        setLoading(false);
+  const getSubDepartmentIds = useCallback((deptId: string, allDepts: Department[]): string[] => {
+    const ids = [deptId];
+    allDepts.filter(d => d.parentId === deptId).forEach(child => {
+      ids.push(...getSubDepartmentIds(child.id, allDepts));
+    });
+    return ids;
+  }, []);
+
+  const allowedDeptIds = React.useMemo(() => {
+    if (['tgd', 'admin'].includes(user.role)) return undefined;
+    if (['gds', 'tp'].includes(user.role)) {
+      if (user.managedDeptIds && user.managedDeptIds.length > 0) {
+        const allIds = new Set<string>();
+        user.managedDeptIds.forEach(id => {
+          getSubDepartmentIds(id, departments).forEach(subId => allIds.add(subId));
+        });
+        return Array.from(allIds);
       }
-    }).catch(e => console.error('fetch projects error', e));
+      if (user.departmentId) {
+        return getSubDepartmentIds(user.departmentId, departments);
+      }
+    }
+    return user.departmentId ? [user.departmentId] : undefined;
+  }, [user, departments, getSubDepartmentIds]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [projData, statsData] = await Promise.all([
+        queryDB('SELECT * FROM projects ORDER BY createdAt DESC LIMIT 100'),
+        fetchProjectStatsSummary(user.role, user.email, allowedDeptIds)
+      ]);
+
+      if (Array.isArray(projData)) {
+        setProjects(projData as Project[]);
+      }
+      if (statsData) {
+        setProjectStats(statsData);
+      }
+    } catch (e) {
+      console.error('fetch projects and stats error', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user.role, user.email, allowedDeptIds]);
+
+  useEffect(() => {
+    loadData();
 
     const unsubMutations = subscribeToMutations((event) => {
-       if (event.entity === 'projects') {
-         if (event.type === 'CREATE') {
-           setProjects(prev => [event.data, ...prev]);
-         } else if (event.type === 'DELETE') {
-           if (event.data.rollback) {
-              setProjects(prev => [event.data.originalData, ...prev]);
-           } else {
-              setProjects(prev => prev.filter(p => p.id !== event.data.id));
-           }
-         }
-       }
+      if (event.entity === 'projects') {
+        if (event.type === 'CREATE') {
+          setProjects(prev => [event.data, ...prev]);
+        } else if (event.type === 'DELETE') {
+          if (event.data.rollback) {
+            setProjects(prev => [event.data.originalData, ...prev]);
+          } else {
+            setProjects(prev => prev.filter(p => p.id !== event.data.id));
+          }
+        }
+      } else if (event.entity === 'leads') {
+        fetchProjectStatsSummary(user.role, user.email, allowedDeptIds).then(setProjectStats);
+      }
     });
 
     return () => {
-      isMounted = false;
       unsubMutations();
     };
-  }, [user]);
+  }, [loadData, user.role, user.email, allowedDeptIds]);
 
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +132,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSumm
         {(user.role === 'tgd' || user.role === 'admin' || user.role === 'tp') && (
           <button
             onClick={() => setIsAdding(!isAdding)}
-            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-colors shadow-sm cursor-pointer"
           >
             <Plus className="w-5 h-5" />
             <span>Thêm Dự án mới</span>
@@ -133,13 +173,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSumm
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
               >
                 Lưu Dự án
               </button>
@@ -150,10 +190,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSumm
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {projects.map((project) => {
-          const projectLeads = leads.filter(l => l.projectId === project.id);
-          const totalProjectLeads = statsSummary ? (statsSummary.projectCounts[project.id] || 0) : projectLeads.length;
-          const contactedLeads = projectLeads.filter(l => l.status === 'Đã liên hệ').length;
-          const closedLeads = projectLeads.filter(l => l.resultStatus === 'Đã booking' || l.resultStatus === 'Đã cọc').length;
+          const stats = projectStats[project.id] || { totalLeads: 0, contactedLeads: 0, closedLeads: 0 };
 
           return (
             <div
@@ -174,9 +211,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSumm
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteProject(project);
+                      handleDeleteProject(e, project);
                     }}
-                    className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                    className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -188,21 +225,21 @@ export const ProjectList: React.FC<ProjectListProps> = ({ user, leads, statsSumm
                   <div className="flex justify-center mb-1">
                     <Users className="w-3.5 h-3.5 text-slate-400" />
                   </div>
-                  <p className="text-xs font-bold text-slate-900">{projectLeads.length}</p>
+                  <p className="text-xs font-bold text-slate-900">{stats.totalLeads}</p>
                   <p className="text-[9px] text-slate-500 uppercase font-medium">Khách</p>
                 </div>
                 <div className="bg-emerald-50 p-2 rounded-lg text-center">
                   <div className="flex justify-center mb-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   </div>
-                  <p className="text-xs font-bold text-emerald-700">{contactedLeads}</p>
+                  <p className="text-xs font-bold text-emerald-700">{stats.contactedLeads}</p>
                   <p className="text-[9px] text-emerald-600 uppercase font-medium">Đã LH</p>
                 </div>
                 <div className="bg-blue-50 p-2 rounded-lg text-center">
                   <div className="flex justify-center mb-1">
                     <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
                   </div>
-                  <p className="text-xs font-bold text-blue-700">{closedLeads}</p>
+                  <p className="text-xs font-bold text-blue-700">{stats.closedLeads}</p>
                   <p className="text-[9px] text-blue-600 uppercase font-medium">Chốt</p>
                 </div>
               </div>

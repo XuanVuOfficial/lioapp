@@ -239,7 +239,7 @@ export default function App() {
         return (
           <ProjectList 
             user={effectiveUser} 
-            leads={leads}
+            departments={departments}
             onProjectClick={(projectId) => {
               setSelectedProjectId(projectId);
               setActiveTab('leads');

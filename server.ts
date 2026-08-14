@@ -192,7 +192,10 @@ async function saveFcmToken(cleanEmail: string, cleanToken: string) {
     // 1. Purge any previous user account tokens registered on this physical device
     await dbPool.query('DELETE FROM user_fcm_tokens WHERE token = ? AND LOWER(email) != ?', [cleanToken, cleanEmail]);
 
-    // 2. Update existing or insert new token record for current active user account
+    // 2. Purge any older tokens for this same email to prevent sending duplicate notifications
+    await dbPool.query('DELETE FROM user_fcm_tokens WHERE LOWER(email) = ? AND token != ?', [cleanEmail, cleanToken]);
+
+    // 3. Update existing or insert new token record for current active user account
     const [existing] = await dbPool.query<mysql.RowDataPacket[]>(
       'SELECT id FROM user_fcm_tokens WHERE token = ? AND LOWER(email) = ?',
       [cleanToken, cleanEmail]
