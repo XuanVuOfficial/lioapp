@@ -1568,7 +1568,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         key={s.uid}
                         type="button"
                         onClick={() => {
-                          handleAssign(showAssignModal, s.email, undefined);
+                          handleAssign(showAssignModal, s.email, s.departmentId || showAssignModal.departmentId);
                           setAssignSearchTerm('');
                         }}
                         className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${isSel ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50 text-slate-700'

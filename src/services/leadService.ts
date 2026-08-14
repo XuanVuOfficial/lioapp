@@ -167,9 +167,12 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   if (assignedToEmail) {
     let displayName = assignedToEmail;
     try {
-      const uData = await queryDB(`SELECT displayName FROM users WHERE email = ${escapeSQL(assignedToEmail)} LIMIT 1`);
-      if (uData && uData.length > 0 && uData[0].displayName) {
-        displayName = uData[0].displayName;
+      const uData = await queryDB(`SELECT displayName, departmentId FROM users WHERE email = ${escapeSQL(assignedToEmail)} LIMIT 1`);
+      if (uData && uData.length > 0) {
+        if (uData[0].displayName) displayName = uData[0].displayName;
+        if (!departmentId && uData[0].departmentId) {
+          departmentId = uData[0].departmentId;
+        }
       }
     } catch (e) { }
     assigneeText = `${displayName} (${assignedToEmail})`;
@@ -302,12 +305,7 @@ export const buildBaseWhereClause = (options: LeadFilterOptions, includeStatus: 
   // Role & Department permission filtering
   if (options.role === 'staff' && options.userEmail) {
     const emailEsc = escapeSQL(options.userEmail);
-    let staffCond = `(assignedToEmail = ${emailEsc} OR creatorEmail = ${emailEsc})`;
-    if (options.departmentIds && options.departmentIds.length > 0 && options.departmentIds.length <= 50) {
-      const ids = options.departmentIds.map(id => escapeSQL(id)).join(', ');
-      staffCond += ` AND departmentId IN (${ids})`;
-    }
-    conditions.push(`(${staffCond})`);
+    conditions.push(`(assignedToEmail = ${emailEsc} OR creatorEmail = ${emailEsc})`);
   } else if (['gds', 'tp'].includes(options.role || '') && options.departmentIds && options.departmentIds.length > 0 && options.departmentIds.length <= 50) {
     const ids = options.departmentIds.map(id => escapeSQL(id)).join(', ');
     conditions.push(`departmentId IN (${ids})`);
