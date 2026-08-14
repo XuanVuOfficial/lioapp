@@ -237,7 +237,20 @@ async function sendZaloWebhookNotification(emailOrUserId: string, message: strin
     let zaloUserId = '';
     let recipientName = '';
     let finalMessage = message;
+    let groupId = DEFAULT_ZALO_GROUP_ID;
 
+    // 1. Fetch dynamic Zalo Group ID from settings table
+    try {
+      const [sRows] = await dbPool.query<mysql.RowDataPacket[]>(
+        'SELECT zaloGroupId FROM settings WHERE id = "app_settings" LIMIT 1'
+      );
+      if (Array.isArray(sRows) && sRows.length > 0 && sRows[0].zaloGroupId) {
+        const customGroupId = String(sRows[0].zaloGroupId).trim();
+        if (customGroupId) groupId = customGroupId;
+      }
+    } catch (err) {}
+
+    // 2. Fetch user information
     if (emailOrUserId.includes('@')) {
       const [rows] = await dbPool.query<mysql.RowDataPacket[]>(
         'SELECT displayName, useridzalo FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
@@ -266,11 +279,11 @@ async function sendZaloWebhookNotification(emailOrUserId: string, message: strin
       }
     }
 
-    const url = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(DEFAULT_ZALO_GROUP_ID)}&userid=${encodeURIComponent(zaloUserId)}&message=${encodeURIComponent(finalMessage)}`;
-    console.log(`[Zalo Webhook] Triggering webhook (userid: "${zaloUserId}")...`);
+    const url = `https://n8n.thienlong.pro.vn/webhook/send-zalo?groupId=${encodeURIComponent(groupId)}&userid=${encodeURIComponent(zaloUserId)}&message=${encodeURIComponent(finalMessage)}`;
+    console.log(`[Zalo Webhook] Triggering webhook (groupId: "${groupId}", userid: "${zaloUserId}")...`);
     const res = await fetch(url);
     if (res.ok) {
-      console.log(`[Zalo Webhook] Successfully sent notification to Zalo (target: ${emailOrUserId}, userid: "${zaloUserId}")`);
+      console.log(`[Zalo Webhook] Successfully sent notification to Zalo (target: ${emailOrUserId}, groupId: "${groupId}", userid: "${zaloUserId}")`);
     } else {
       console.warn(`[Zalo Webhook] Failed to send notification to ${emailOrUserId}, status: ${res.status}`);
     }
@@ -617,6 +630,7 @@ async function checkAndRevokeOverdueLeads() {
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS isUpdatedByAssignee TINYINT(1) DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS useridzalo VARCHAR(255);
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS zaloGroupId VARCHAR(100);
     `).catch(() => { });
 
     // 2. Find leads assigned > 10 minutes ago where isUpdatedByAssignee is false/0

@@ -11,6 +11,7 @@ export interface AppSettings {
     tp: number | null;
     staff: number | null;
   };
+  zaloGroupId?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -27,7 +28,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     gds: null,
     tp: null,
     staff: null
-  }
+  },
+  zaloGroupId: '4814904778699793764'
 };
 
 const parseSettings = (row: any): AppSettings => {
@@ -41,6 +43,9 @@ const parseSettings = (row: any): AppSettings => {
     try {
       settings.roleLimits = typeof row.roleLimits === 'string' ? JSON.parse(row.roleLimits) : row.roleLimits;
     } catch(e){}
+  }
+  if (row.zaloGroupId) {
+    settings.zaloGroupId = String(row.zaloGroupId).trim();
   }
   return settings;
 }
@@ -59,7 +64,13 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 };
 
 export const updateAppSettings = async (settings: AppSettings): Promise<void> => {
-  await executeMutation('settings', 'UPDATE', settings, `INSERT INTO settings (id, tabVisibility, roleLimits) VALUES (${escapeSQL(DOC_ID)}, ${escapeSQL(settings.tabVisibility)}, ${escapeSQL(settings.roleLimits)}) ON DUPLICATE KEY UPDATE tabVisibility = VALUES(tabVisibility), roleLimits = VALUES(roleLimits)`);
+  const zaloGroup = settings.zaloGroupId ? settings.zaloGroupId.trim() : '4814904778699793764';
+  await executeMutation(
+    'settings',
+    'UPDATE',
+    settings,
+    `INSERT INTO settings (id, tabVisibility, roleLimits, zaloGroupId) VALUES (${escapeSQL(DOC_ID)}, ${escapeSQL(settings.tabVisibility)}, ${escapeSQL(settings.roleLimits)}, ${escapeSQL(zaloGroup)}) ON DUPLICATE KEY UPDATE tabVisibility = VALUES(tabVisibility), roleLimits = VALUES(roleLimits), zaloGroupId = VALUES(zaloGroupId)`
+  );
 };
 
 export const subscribeToSettings = (callback: (settings: AppSettings) => void) => {

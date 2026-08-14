@@ -14,6 +14,7 @@ import { ProjectList } from './components/ProjectList';
 import { Settings } from './components/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { AppUpdateScreen } from './components/AppUpdateScreen';
 import { Loader2 } from 'lucide-react';
 import { MandatoryZaloModal } from './components/MandatoryZaloModal';
 import { SoftNotificationModal } from './components/SoftNotificationModal';
@@ -279,6 +280,7 @@ export default function App() {
         </>
       )}
       <PWAInstallPrompt />
+      <AppUpdateScreen />
       <div 
         className="fixed bottom-1 right-2 z-50 pointer-events-none select-none text-[10px] font-mono text-slate-400 opacity-40 hover:opacity-100 transition-opacity bg-slate-900/10 dark:bg-slate-900/30 px-1.5 py-0.5 rounded backdrop-blur-xs"
         title={`Phiên bản ứng dụng: v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.2'}`}

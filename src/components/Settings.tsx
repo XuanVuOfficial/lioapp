@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings as SettingsIcon, LayoutDashboard, UserPlus, Briefcase, Users, UserCircle, Save, Check, Bell } from 'lucide-react';
+import { Settings as SettingsIcon, LayoutDashboard, UserPlus, Briefcase, Users, UserCircle, Save, Check, Bell, MessageCircle } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { AppSettings, updateAppSettings, getAppSettings } from '../services/settingsService';
 
@@ -209,6 +209,47 @@ export const Settings: React.FC<Props> = ({ user }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Zalo Webhook Group ID Setting */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+      >
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+            <MessageCircle className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900">Cấu hình Zalo Webhook (Group ID)</h3>
+            <p className="text-sm text-slate-500 mt-0.5">
+              ID nhóm Zalo nhận tin nhắn thông báo khi phân bổ hoặc tạo mới khách hàng tiềm năng.
+            </p>
+          </div>
+        </div>
+        <div className="p-6">
+          <div className="max-w-md space-y-2">
+            <label className="block text-sm font-semibold text-slate-700">
+              DEFAULT_ZALO_GROUP_ID
+            </label>
+            <input
+              type="text"
+              placeholder="4814904778699793764"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50 font-mono text-sm outline-none transition-all"
+              value={settings.zaloGroupId ?? ''}
+              onChange={(e) => {
+                setSettings({
+                  ...settings,
+                  zaloGroupId: e.target.value
+                });
+              }}
+            />
+            <p className="text-xs text-slate-400">
+              Mặc định: <code className="text-slate-600 font-mono font-semibold">4814904778699793764</code>
+            </p>
           </div>
         </div>
       </motion.div>
