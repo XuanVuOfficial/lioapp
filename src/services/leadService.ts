@@ -328,7 +328,11 @@ export const buildBaseWhereClause = (options: LeadFilterOptions, includeStatus: 
 
   // Status Tab Filter (only if includeStatus is true)
   if (includeStatus && options.status && options.status !== 'Tất cả') {
-    conditions.push(`status = ${escapeSQL(options.status)}`);
+    if (options.status === 'Chờ phân chia data') {
+      conditions.push(`(assignedToEmail IS NULL OR assignedToEmail = '')`);
+    } else {
+      conditions.push(`status = ${escapeSQL(options.status)}`);
+    }
   }
 
   // Assignee Filter
@@ -376,11 +380,12 @@ export const fetchLeadStats = async (
       resultStatus, 
       projectId, 
       departmentId, 
+      (assignedToEmail IS NULL OR assignedToEmail = '') as isUnassigned,
       DATE(createdAt) as dateStr,
       COUNT(*) as count 
     FROM leads 
     ${whereClause} 
-    GROUP BY status, subStatus, resultStatus, projectId, departmentId, DATE(createdAt)
+    GROUP BY status, subStatus, resultStatus, projectId, departmentId, (assignedToEmail IS NULL OR assignedToEmail = ''), DATE(createdAt)
   `;
 
   try {
@@ -389,6 +394,7 @@ export const fetchLeadStats = async (
     let total = 0;
     const statusCounts: Record<string, number> = {
       'Tất cả': 0,
+      'Chờ phân chia data': 0,
       'Chưa liên hệ': 0,
       'Không liên hệ được': 0,
       'Đã liên hệ': 0
@@ -414,6 +420,9 @@ export const fetchLeadStats = async (
         const c = Number(row.count) || 0;
         total += c;
 
+        if (row.isUnassigned === 1 || row.isUnassigned === '1' || row.isUnassigned === true) {
+          statusCounts['Chờ phân chia data'] = (statusCounts['Chờ phân chia data'] || 0) + c;
+        }
         if (row.status) statusCounts[row.status] = (statusCounts[row.status] || 0) + c;
         if (row.resultStatus) resultCounts[row.resultStatus] = (resultCounts[row.resultStatus] || 0) + c;
         if (row.subStatus) subStatusCounts[row.subStatus] = (subStatusCounts[row.subStatus] || 0) + c;

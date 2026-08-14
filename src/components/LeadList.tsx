@@ -240,7 +240,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     fetchProjects();
   }, []);
 
-  const statuses = ['Tất cả', 'Chưa liên hệ', 'Không liên hệ được', 'Đã liên hệ'];
+  const statuses = React.useMemo(() => {
+    const canAssign = ['tgd', 'admin', 'gds', 'tp'].includes(user.role);
+    if (canAssign) {
+      return ['Tất cả', 'Chờ phân chia data', 'Chưa liên hệ', 'Không liên hệ được', 'Đã liên hệ'];
+    }
+    return ['Tất cả', 'Chưa liên hệ', 'Không liên hệ được', 'Đã liên hệ'];
+  }, [user.role]);
   const subStatuses = {
     'Không liên hệ được': ['Thuê bao', 'Không bắt máy', 'Bận'],
     'Đã liên hệ': ['Đang tư vấn', 'Rác / Không quan tâm']
@@ -1030,39 +1036,64 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         <>
           <div className="mb-2 md:mb-6 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
             <div className="flex space-x-1 md:space-x-2 border-b border-slate-200 min-w-max">
-              {statuses.map(status => (
-                <button
-                  key={status}
-                  onClick={() => setCurrentTab(status)}
-                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
-                    currentTab === status
-                      ? 'border-emerald-600 text-emerald-600 font-bold'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
+              {statuses.map(status => {
+                const isUnassigned = status === 'Chờ phân chia data';
+                const unassignedCount = statsSummary?.statusCounts['Chờ phân chia data'] || 0;
+
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setCurrentTab(status)}
+                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
+                      currentTab === status
+                        ? isUnassigned
+                          ? 'border-amber-500 text-amber-600 font-bold'
+                          : 'border-emerald-600 text-emerald-600 font-bold'
+                        : isUnassigned
+                          ? 'border-transparent text-amber-600/90 hover:text-amber-700 hover:border-amber-300'
+                          : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>{status}</span>
+                    {isUnassigned && unassignedCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                        {unassignedCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="space-y-3">
         {isLoadingLeads ? (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={`skel-lead-${i}`} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-pulse flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3 w-full md:w-1/4">
-                  <div className="w-10 h-10 bg-slate-200 rounded-xl shrink-0"></div>
-                  <div className="space-y-2 flex-1">
+              <div key={`skel-lead-${i}`} className="bg-white p-3.5 md:px-5 md:py-3.5 rounded-2xl border border-slate-200 shadow-2xs animate-pulse flex flex-col md:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3 w-full md:w-[220px]">
+                  <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-200 rounded-xl shrink-0"></div>
+                  <div className="space-y-1.5 flex-1">
                     <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-slate-150 rounded w-1/2"></div>
+                    <div className="h-2.5 bg-slate-150 rounded w-1/2"></div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-1/3">
-                  <div className="h-6 bg-slate-200 rounded-full w-24"></div>
-                  <div className="h-6 bg-slate-150 rounded-full w-20"></div>
+                <div className="hidden sm:flex flex-col gap-1.5 w-[140px]">
+                  <div className="h-3 bg-slate-200 rounded w-24"></div>
+                  <div className="h-2.5 bg-slate-150 rounded w-16"></div>
                 </div>
-                <div className="h-4 bg-slate-200 rounded w-28"></div>
+                <div className="hidden md:flex flex-1 items-center gap-2">
+                  <div className="h-6 bg-slate-200 rounded-full w-20"></div>
+                  <div className="h-6 bg-slate-150 rounded-full w-24"></div>
+                </div>
+                <div className="hidden lg:flex flex-col gap-1.5 w-[160px]">
+                  <div className="h-3 bg-slate-200 rounded w-24"></div>
+                  <div className="h-2.5 bg-slate-150 rounded w-20"></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-slate-200 rounded-full"></div>
+                  <div className="w-7 h-7 bg-slate-150 rounded-lg"></div>
+                </div>
               </div>
             ))}
           </div>
@@ -1074,115 +1105,182 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <p className="text-sm px-4 text-center">Không tìm thấy khách hàng nào. Hãy tạo mới để bắt đầu.</p>
             </div>
           ) : (
-            displayedLeads.map(lead => (
-              <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                key={lead.id}
-                onClick={() => handleSelectLead(lead)}
-                className={`rounded-2xl shadow-sm hover:shadow-md transition-all group cursor-pointer p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                  !lead.assignedToEmail 
-                    ? 'bg-amber-50/90 border-2 border-amber-300 shadow-amber-100/50' 
-                    : 'bg-white border border-slate-200'
-                }`}
-              >
-                <div className="flex items-start gap-3 md:w-1/4">
-                  <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-                    <User className="w-4 h-4 md:w-5 md:h-5 text-slate-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 text-sm md:text-base leading-tight truncate">{lead.customerName}</h3>
-                    <p className="text-[10px] md:text-xs text-slate-500">
-                      {lead.customerCode ? `Mã KH: ${lead.customerCode}` : `ID: ${lead.id.slice(0, 8)}`}
-                    </p>
-                  </div>
-                </div>
+            displayedLeads.map(lead => {
+              const deptName = departments.find(d => d.id === lead.departmentId)?.name || 'Chưa có phòng ban';
+              const projName = projects.find(p => p.id === lead.projectId)?.name || '';
+              const countdown = getLeadCountdown(lead);
 
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                    <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    {lead.phone}
-                  </div>
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  key={lead.id}
+                  onClick={() => handleSelectLead(lead)}
+                  className={`rounded-2xl shadow-2xs hover:shadow-md transition-all group cursor-pointer p-3.5 md:px-5 md:py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                    !lead.assignedToEmail 
+                      ? 'bg-amber-50/80 border-2 border-amber-300 shadow-amber-100/40' 
+                      : 'bg-white hover:bg-slate-50/60 border border-slate-200'
+                  }`}
+                >
+                  {/* --- TOP / LEFT: Khách hàng (Avatar + Tên + Mã) --- */}
+                  <div className="flex items-center justify-between md:justify-start gap-3 min-w-0 md:w-[220px] lg:w-[240px] shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-100 group-hover:bg-emerald-50 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                        <User className="w-4 h-4 md:w-5 md:h-5 text-slate-500 group-hover:text-emerald-600 transition-colors" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-900 text-sm md:text-base leading-snug truncate group-hover:text-emerald-700 transition-colors">
+                          {lead.customerName}
+                        </h3>
+                        <p className="text-[10px] md:text-xs text-slate-400 font-mono truncate">
+                          {lead.customerCode ? `Mã KH: ${lead.customerCode}` : `ID: ${lead.id.slice(0, 8)}`}
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                    <Tag className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    <div className="flex flex-wrap items-center gap-1">
-                      {(() => {
-                        const countdown = getLeadCountdown(lead);
-                        if (!countdown) return null;
-                        return (
-                          <span 
-                            title="Hạn cập nhật phản hồi lần 1 (30 phút)"
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-mono font-bold tracking-wider shadow-xs ${
-                              countdown.isDanger
-                                ? 'bg-rose-600 text-white animate-pulse'
-                                : 'bg-amber-500 text-white'
-                            }`}
-                          >
-                            <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                            {countdown.formatted}
-                          </span>
-                        );
-                      })()}
-                      {!lead.assignedToEmail && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white shadow-xs">
-                          Chưa chia cho ai ⚠️
+                    {/* Mobile Only Countdown & Status Badge on Header Right */}
+                    <div className="flex md:hidden items-center gap-1.5 shrink-0">
+                      {countdown && (
+                        <span 
+                          title="Hạn cập nhật phản hồi lần 1 (30 phút)"
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider shadow-2xs ${
+                            countdown.isDanger
+                              ? 'bg-rose-600 text-white animate-pulse'
+                              : 'bg-amber-500 text-white'
+                          }`}
+                        >
+                          <Clock className="w-2.5 h-2.5" />
+                          {countdown.formatted}
                         </span>
                       )}
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                         lead.status === 'Chưa liên hệ' ? 'bg-slate-100 text-slate-600' :
                         lead.status === 'Không liên hệ được' ? 'bg-red-50 text-red-600' :
                         'bg-emerald-50 text-emerald-600'
                       }`}>
                         {lead.status}
                       </span>
-                      {lead.subStatus && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600">
-                          {lead.subStatus}
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                    <Briefcase className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    <span className="truncate">{departments.find(d => d.id === lead.departmentId)?.name || 'Chưa có phòng ban'}</span>
-                  </div>
-
-                  {lead.projectId && (
-                    <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                      <FolderKanban className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                      <span className="truncate">{projects.find(p => p.id === lead.projectId)?.name || 'Dự án không tồn tại'}</span>
+                  {/* --- COLUMN 2 (PC): Số điện thoại & Ngày cập nhật --- */}
+                  <div className="hidden sm:flex flex-col gap-0.5 w-[140px] lg:w-[150px] shrink-0 text-xs">
+                    <div className="flex items-center gap-2 font-semibold text-slate-700">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{lead.phone}</span>
                     </div>
-                  )}
-
-                  <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
-                    <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    {new Date(lead.updatedAt).toLocaleDateString()}
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+                      <Clock className="w-3 h-3 text-slate-350 shrink-0" />
+                      <span>{new Date(lead.updatedAt).toLocaleDateString('vi-VN')}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between md:w-1/4 md:justify-end gap-4">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex -space-x-2">
-                      <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[8px] md:text-[10px] font-bold" title={`Tạo bởi: ${lead.creatorEmail}`}>
-                        {lead.creatorEmail[0].toUpperCase()}
+                  {/* --- COLUMN 3 (PC): Trạng thái & Countdown pills --- */}
+                  <div className="hidden md:flex flex-1 items-center flex-wrap gap-1.5 min-w-0">
+                    {countdown && (
+                      <span 
+                        title="Hạn cập nhật phản hồi lần 1 (30 phút)"
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider shadow-2xs ${
+                          countdown.isDanger
+                            ? 'bg-rose-600 text-white animate-pulse'
+                            : 'bg-amber-500 text-white'
+                        }`}
+                      >
+                        <Clock className="w-3 h-3" />
+                        {countdown.formatted}
+                      </span>
+                    )}
+
+                    {!lead.assignedToEmail && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white shadow-2xs">
+                        Chưa chia cho ai ⚠️
+                      </span>
+                    )}
+
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      lead.status === 'Chưa liên hệ' ? 'bg-slate-100 text-slate-600' :
+                      lead.status === 'Không liên hệ được' ? 'bg-red-50 text-red-600' :
+                      'bg-emerald-50 text-emerald-600'
+                    }`}>
+                      {lead.status}
+                    </span>
+
+                    {lead.subStatus && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600">
+                        {lead.subStatus}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* --- COLUMN 4 (PC): Phòng ban & Dự án --- */}
+                  <div className="hidden lg:flex flex-col gap-0.5 w-[160px] xl:w-[190px] shrink-0 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-700 truncate" title={deptName}>
+                      <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate font-medium">{deptName}</span>
+                    </div>
+                    {projName && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium truncate" title={projName}>
+                        <FolderKanban className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{projName}</span>
                       </div>
-                      {lead.assignedToEmail && (
-                        <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-200 border-2 border-white flex items-center justify-center text-[8px] md:text-[10px] font-bold" title={`Giao cho: ${lead.assignedToEmail}`}>
-                          {lead.assignedToEmail[0].toUpperCase()}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
+
+                  {/* --- MOBILE MIDDLE INFO ROW --- */}
+                  <div className="flex sm:hidden flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 pt-1 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{lead.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                      <Clock className="w-3 h-3 text-slate-350" />
+                      <span>{new Date(lead.updatedAt).toLocaleDateString('vi-VN')}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-600 truncate max-w-[150px]">
+                      <Briefcase className="w-3 h-3 text-slate-400" />
+                      <span className="truncate">{deptName}</span>
+                    </div>
+                    {projName && (
+                      <div className="flex items-center gap-1.5 text-slate-500 text-[11px] truncate max-w-[150px]">
+                        <FolderKanban className="w-3 h-3 text-slate-400" />
+                        <span className="truncate">{projName}</span>
+                      </div>
+                    )}
+                    {lead.subStatus && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600">
+                        {lead.subStatus}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* --- COLUMN 5 (PC & Mobile): Người phụ trách & Thao tác --- */}
+                  <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex -space-x-2">
+                        <div 
+                          className="w-6 h-6 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[9px] font-bold text-slate-700 shadow-2xs" 
+                          title={`Tạo bởi: ${lead.creatorEmail}`}
+                        >
+                          {lead.creatorEmail[0].toUpperCase()}
+                        </div>
+                        {lead.assignedToEmail && (
+                          <div 
+                            className="w-6 h-6 rounded-full bg-emerald-100 border-2 border-white flex items-center justify-center text-[9px] font-bold text-emerald-700 shadow-2xs" 
+                            title={`Giao cho: ${lead.assignedToEmail}`}
+                          >
+                            {lead.assignedToEmail[0].toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
                       {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); setShowAssignModal(lead); }}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
                           title="Giao khách hàng"
                         >
                           <UserPlus className="w-4 h-4" />
@@ -1194,14 +1292,14 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                             e.stopPropagation();
                             setActionMenuOpenId(actionMenuOpenId === lead.id ? null : lead.id);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         {actionMenuOpenId === lead.id && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenuOpenId(null); }} />
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 py-1" onClick={e => e.stopPropagation()}>
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-1.5" onClick={e => e.stopPropagation()}>
                               {['tgd', 'admin'].includes(user.role) ? (
                                 <>
                                   <button
@@ -1210,22 +1308,22 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                                       setActionMenuOpenId(null);
                                       setLeadToEdit(lead);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                                   >
-                                    <Edit2 className="w-4 h-4" /> Sửa thông tin
+                                    <Edit2 className="w-3.5 h-3.5" /> Sửa thông tin
                                   </button>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleDeleteLead(lead);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
                                   >
-                                    <Trash2 className="w-4 h-4" /> Xoá khách hàng
+                                    <Trash2 className="w-3.5 h-3.5" /> Xoá khách hàng
                                   </button>
                                 </>
                               ) : (
-                                <div className="px-4 py-2 text-sm text-slate-500 italic">Không có hành động</div>
+                                <div className="px-4 py-2 text-xs text-slate-500 italic">Không có hành động</div>
                               )}
                             </div>
                           </>
@@ -1233,9 +1331,9 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                       </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            ))
+                </motion.div>
+              );
+            })
           )}
         </AnimatePresence>
         )}
