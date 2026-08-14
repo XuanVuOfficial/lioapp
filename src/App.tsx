@@ -22,8 +22,6 @@ import { AppSettings, subscribeToSettings } from './services/settingsService';
 import { registerNotifications } from './services/notificationService';
 
 
-const TGD_EMAIL = 'Tongsan@gmail.com';
-
 const getSubDepartmentIds = (deptId: string, allDepts: Department[]): string[] => {
   const ids = [deptId];
   const children = allDepts.filter(d => d.parentId === deptId);
@@ -49,10 +47,6 @@ export default function App() {
       if (storedUid) {
         const profile = await getUserProfile(storedUid);
         if (profile) {
-          // Force TGD role for TGD email
-          if (profile.email === TGD_EMAIL) {
-            profile.role = 'tgd';
-          }
           setUser(profile);
         } else {
           localStorage.removeItem('salespro_uid');

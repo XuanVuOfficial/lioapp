@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Briefcase, LogIn, Mail, Lock, AlertCircle, Save } from 'lucide-react';
-import { verifyCredentials, createUserProfile, updateUserProfile } from '../services/userService';
+import { verifyCredentials, updateUserProfile } from '../services/userService';
 
 interface Props {
   onLogin: (user: any) => void;
@@ -23,28 +23,9 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const loginEmail = email === 'admin' ? 'Tongsan@gmail.com' : email;
-      
-      let profile = await verifyCredentials(loginEmail, password);
-      
-      // Bootstrap TGĐ if it doesn't exist
-      if (!profile && loginEmail === 'Tongsan@gmail.com' && password === '342343234232') {
-        profile = {
-          uid: 'tgd_root',
-          email: 'Tongsan@gmail.com',
-          displayName: 'Tổng giám đốc',
-          role: 'tgd',
-          password: '342343234232'
-        };
-        await createUserProfile(profile);
-      }
+      const profile = await verifyCredentials(email, password);
 
       if (profile) {
-        // Force TGD role for TGD email
-        if (profile.email === 'Tongsan@gmail.com') {
-          profile.role = 'tgd';
-        }
-
         if (profile.mustChangePassword) {
           setTempProfile(profile);
           setRequirePasswordChange(true);

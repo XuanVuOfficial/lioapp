@@ -268,8 +268,8 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
     setParentId(undefined);
     setNewDept({
       name: 'Tổng sàn',
-      managerEmail: 'Tongsan@gmail.com',
-      managerName: 'Tổng giám đốc'
+      managerEmail: user?.email || '',
+      managerName: user?.displayName || ''
     });
     setShowAddModal(true);
   };
