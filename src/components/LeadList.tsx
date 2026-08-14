@@ -410,8 +410,10 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   };
 
   // 2. Fetch 20 Leads for currently active Tab (FAST: Exactly 1 single 20-item query per tab/filter)
-  const loadTabLeads = React.useCallback(async () => {
-    setIsLoadingLeads(true);
+  const loadTabLeads = React.useCallback(async (isSilent: boolean = false) => {
+    if (!isSilent) {
+      setIsLoadingLeads(true);
+    }
     setPage(1);
     try {
       const paginatedRes = await fetchPaginatedLeads({
@@ -432,12 +434,14 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     } catch (e) {
       console.error('Error fetching tab leads:', e);
     } finally {
-      setIsLoadingLeads(false);
+      if (!isSilent) {
+        setIsLoadingLeads(false);
+      }
     }
   }, [user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm]);
 
   useEffect(() => {
-    loadTabLeads();
+    loadTabLeads(false);
   }, [loadTabLeads]);
 
   const activeSubDeptIdsKey = React.useMemo(() => {
@@ -445,7 +449,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   }, [activeSubDeptIds]);
 
   const refreshLeadsAndStats = React.useCallback(() => {
-    loadTabLeads();
+    loadTabLeads(true);
     if (showStats) {
       loadStats();
     }

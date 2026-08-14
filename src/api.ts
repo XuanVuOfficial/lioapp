@@ -87,12 +87,17 @@ export const escapeSQL = (val: any): string => {
 
 export const subscribeDB = (sql: string, callback: (data: any[]) => void, intervalMs: number = 5000) => {
   let isMounted = true;
+  let lastJson = '';
   const fetchData = async () => {
     try {
       const data = await queryDB(sql);
       if (isMounted) {
-        // Assume data is an array
-        callback(Array.isArray(data) ? data : []);
+        const arr = Array.isArray(data) ? data : [];
+        const json = JSON.stringify(arr);
+        if (json !== lastJson) {
+          lastJson = json;
+          callback(arr);
+        }
       }
     } catch (e) {
       console.error("subscribeDB Error:", e);

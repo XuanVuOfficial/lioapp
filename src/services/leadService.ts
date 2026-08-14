@@ -588,7 +588,9 @@ export const subscribeToLeadChanges = (
   intervalMs: number = 5000
 ) => {
   let whereClause = '';
-  if (departmentIds && departmentIds.length > 0 && departmentIds.length <= 10) {
+  if (role === 'staff') {
+    whereClause = `WHERE (assignedToEmail = ${escapeSQL(email)} OR creatorEmail = ${escapeSQL(email)})`;
+  } else if (departmentIds && departmentIds.length > 0 && departmentIds.length <= 10) {
     const ids = departmentIds.map(id => escapeSQL(id)).join(', ');
     whereClause = `WHERE departmentId IN (${ids})`;
   }
