@@ -93,9 +93,7 @@ export default function App() {
     
     let effectiveRole: UserRole = user.role;
     
-    if (user.email === TGD_EMAIL) {
-      effectiveRole = 'tgd';
-    } else if (isManager) {
+    if (isManager) {
       // Find the highest level department they manage
       const highestDept = [...managedDepts].sort((a,b) => a.level - b.level)[0];
       if (highestDept.level === 0) effectiveRole = 'tgd';
@@ -151,17 +149,25 @@ export default function App() {
           }
         }
       } else if (event.entity === 'departments') {
-         if (event.type === 'UPDATE') {
+         if (event.type === 'CREATE') {
+           setDepartments(prev => [...prev.filter(d => d.id !== event.data.id), event.data]);
+         } else if (event.type === 'UPDATE') {
            setDepartments(prev => prev.map(d => d.id === event.data.id ? { ...d, ...event.data } : d));
+         } else if (event.type === 'DELETE') {
+           setDepartments(prev => prev.filter(d => d.id !== event.data.id));
          }
       } else if (event.entity === 'users') {
-        if (event.type === 'UPDATE') {
+        if (event.type === 'CREATE') {
+          setStaff(prev => [event.data, ...prev.filter(s => s.uid !== event.data.uid)]);
+        } else if (event.type === 'UPDATE') {
           setStaff(prev => prev.map(s => s.uid === event.data.uid ? { ...s, ...event.data } : s));
+          setUser(prev => prev && prev.uid === event.data.uid ? { ...prev, ...event.data } : prev);
         } else if (event.type === 'DELETE') {
           if (event.data.rollback) {
              setStaff(prev => [event.data.originalData, ...prev]);
           } else {
-             setStaff(prev => prev.filter(s => s.uid !== event.data.id));
+             const deletedId = event.data.uid || event.data.id;
+             setStaff(prev => prev.filter(s => s.uid !== deletedId));
           }
         }
       } else if (event.entity === 'settings') {

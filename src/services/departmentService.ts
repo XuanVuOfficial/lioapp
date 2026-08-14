@@ -25,11 +25,7 @@ export const deleteDepartment = async (dept: Department): Promise<void> => {
 };
 
 export const subscribeToDepartments = (callback: (depts: Department[]) => void) => {
-  let isMounted = true;
-  queryDB(`SELECT * FROM departments ORDER BY level ASC LIMIT 100`).then((data: any[]) => {
-    if (isMounted && Array.isArray(data)) {
-      callback(data.map(parseDepartment));
-    }
-  }).catch(e => console.error('subscribeToDepartments error', e));
-  return () => { isMounted = false; };
+  return subscribeDB(`SELECT * FROM departments ORDER BY level ASC LIMIT 100`, (data: any[]) => {
+    callback(data.map(parseDepartment));
+  }, 5000);
 };

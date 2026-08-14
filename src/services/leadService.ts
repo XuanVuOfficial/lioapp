@@ -10,6 +10,7 @@ const parseLead = (row: any): Lead => {
   } else {
     lead.history = [];
   }
+  lead.isUpdatedByAssignee = lead.isUpdatedByAssignee === 1 || lead.isUpdatedByAssignee === '1' || lead.isUpdatedByAssignee === true;
   return lead as Lead;
 };
 
@@ -39,7 +40,7 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
       if (uData && uData.length > 0 && uData[0].displayName) {
         displayName = uData[0].displayName;
       }
-    } catch (e) {}
+    } catch (e) { }
     assigneeText = `${displayName} (${lead.assignedToEmail})`;
   }
 
@@ -82,14 +83,14 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
             if (pData && pData.length > 0 && pData[0].name) {
               projectName = pData[0].name;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         const projDisplay = projectName ? projectName : 'chưa xác định';
-        const notificationMsg = `Bạn vừa nhận được data lead mới thuộc dự án ${projDisplay}\n\nBạn có 30 phút để cập nhật phản hồi lần 1!`;
+        const notificationMsg = `Bạn vừa nhận được data lead mới thuộc dự án ${projDisplay}\n\nBạn có 30 phút để cập nhật phản hồi lần 1 trên app HKTT!`;
 
         const { sendPushNotification } = await import('./notificationService');
-        sendPushNotification(_assignedTo, 'Data lead mới 💼', notificationMsg).catch(() => {});
-        sendZaloNotification(_assignedTo, notificationMsg).catch(() => {});
+        sendPushNotification(_assignedTo, 'Data lead mới 💼', notificationMsg).catch(() => { });
+        sendZaloNotification(_assignedTo, notificationMsg).catch(() => { });
       } catch (err) {
         console.error('Error sending notification for new lead:', err);
       }
@@ -170,7 +171,7 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
       if (uData && uData.length > 0 && uData[0].displayName) {
         displayName = uData[0].displayName;
       }
-    } catch (e) {}
+    } catch (e) { }
     assigneeText = `${displayName} (${assignedToEmail})`;
   }
   const historyEntry = `[LOG][${timestamp}] Người phụ trách: ${assigneeText}`;
@@ -209,7 +210,7 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
 
       // 1. Push notification to revoked staff (no Zalo on revoke, no SĐT)
       if (_prevEmail && _prevEmail.toLowerCase() !== (_newEmail || '').toLowerCase()) {
-        sendPushNotification(_prevEmail, 'Thu hồi khách hàng ⚠️', `Khách hàng ${_custName} đã bị thu hồi khỏi danh sách quản lý của bạn.`).catch(() => {});
+        sendPushNotification(_prevEmail, 'Thu hồi khách hàng ⚠️', `Khách hàng ${_custName} đã bị thu hồi khỏi danh sách quản lý của bạn.`).catch(() => { });
       }
 
       // 2. Push & Zalo notification to newly assigned staff (no SĐT)
@@ -221,13 +222,13 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
             if (pData && pData.length > 0 && pData[0].name) {
               projectName = pData[0].name;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         const projDisplay = projectName ? projectName : 'chưa xác định';
-        const notificationMsg = `Bạn vừa nhận được data lead mới thuộc dự án ${projDisplay}\n\nBạn có 30 phút để cập nhật phản hồi lần 1!`;
+        const notificationMsg = `Bạn vừa nhận được data lead mới thuộc dự án ${projDisplay}\n\nBạn có 30 phút để cập nhật phản hồi lần 1 trên app HKTT!`;
 
-        sendPushNotification(_newEmail, 'Data lead mới 💼', notificationMsg).catch(() => {});
-        sendZaloNotification(_newEmail, notificationMsg).catch(() => {});
+        sendPushNotification(_newEmail, 'Data lead mới 💼', notificationMsg).catch(() => { });
+        sendZaloNotification(_newEmail, notificationMsg).catch(() => { });
       }
     } catch (err) {
       console.error('Error sending notifications on assignLead:', err);

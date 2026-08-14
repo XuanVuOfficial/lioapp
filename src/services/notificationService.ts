@@ -63,8 +63,8 @@ export const registerNotifications = async (email: string, forceRegister: boolea
     }
 
     // 2. Obtain active unified PWA Service Worker (contains FCM push handler)
-    let registration: ServiceWorkerRegistration | undefined = await navigator.serviceWorker.ready;
-    if (!registration) {
+    let registration: ServiceWorkerRegistration | undefined = await navigator.serviceWorker?.ready;
+    if (!registration && navigator.serviceWorker?.getRegistrations) {
       const registrations = await navigator.serviceWorker.getRegistrations();
       registration = registrations[0];
     }
@@ -100,11 +100,11 @@ export const registerNotifications = async (email: string, forceRegister: boolea
       isForegroundListenerAttached = true;
       onMessage(messaging, (payload) => {
         console.log('Received FCM foreground message:', payload);
-        const pData = payload.data || payload.notification || {};
+        const pData = payload.data || (payload as any).notification || {};
         const title = pData.title || 'HKTT CRM';
         const body = pData.body || '';
         if (title && body) {
-          const options: NotificationOptions = {
+          const options: any = {
             body: body,
             icon: pData.icon || 'https://thienlong.pro.vn/icon.jpg',
             badge: pData.badge || 'https://thienlong.pro.vn/icon.jpg',
@@ -115,9 +115,9 @@ export const registerNotifications = async (email: string, forceRegister: boolea
           
           if (registration && typeof registration.showNotification === 'function') {
             registration.showNotification(title, options).catch(() => {
-              new Notification(title, options);
+              if (typeof Notification !== 'undefined') new Notification(title, options);
             });
-          } else {
+          } else if (typeof Notification !== 'undefined') {
             new Notification(title, options);
           }
         }

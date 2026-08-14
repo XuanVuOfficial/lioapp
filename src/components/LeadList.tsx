@@ -169,16 +169,31 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     }
   };
 
+  const getLeadCountdown = (lead?: Lead | null) => {
+    if (!lead || !lead.assignedToEmail || lead.isUpdatedByAssignee || !lead.assignedAt) return null;
+    const assignedTime = new Date(lead.assignedAt).getTime();
+    if (isNaN(assignedTime)) return null;
+
+    const elapsedSec = Math.floor((Date.now() - assignedTime) / 1000);
+    const remainingSec = Math.max(0, 30 * 60 - elapsedSec);
+    const mins = Math.floor(remainingSec / 60);
+    const secs = remainingSec % 60;
+    const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const isDanger = remainingSec <= 300;
+    const isExpired = remainingSec === 0;
+
+    return { remainingSec, formatted, isDanger, isExpired };
+  };
+
   const [, setTick] = useState(0);
 
-  // Live 1-second ticker for active lead countdown timer
+  // Live 1-second ticker for active lead countdown timers (both outside list and modal)
   useEffect(() => {
-    if (!selectedLead || !selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee) return;
     const interval = setInterval(() => {
       setTick(t => t + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [selectedLead]);
+  }, []);
 
   const [newNote, setNewNote] = useState('');
   const [newLead, setNewLead] = useState<Partial<Lead>>({
@@ -1089,7 +1104,24 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
                   <div className="flex items-center gap-3 text-xs md:text-sm text-slate-600">
                     <Tag className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400" />
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {(() => {
+                        const countdown = getLeadCountdown(lead);
+                        if (!countdown) return null;
+                        return (
+                          <span 
+                            title="Hạn cập nhật phản hồi lần 1 (30 phút)"
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-mono font-bold tracking-wider shadow-xs ${
+                              countdown.isDanger
+                                ? 'bg-rose-600 text-white animate-pulse'
+                                : 'bg-amber-500 text-white'
+                            }`}
+                          >
+                            <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                            {countdown.formatted}
+                          </span>
+                        );
+                      })()}
                       {!lead.assignedToEmail && (
                         <span className="px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white shadow-xs">
                           Chưa chia cho ai ⚠️
@@ -1612,31 +1644,23 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
               {/* 30-Minute Lead Update Countdown Banner */}
               {(() => {
-                if (!selectedLead.assignedToEmail || selectedLead.isUpdatedByAssignee || !selectedLead.assignedAt) return null;
-                const assignedTime = new Date(selectedLead.assignedAt).getTime();
-                if (isNaN(assignedTime)) return null;
-
-                const elapsedSec = Math.floor((Date.now() - assignedTime) / 1000);
-                const remainingSec = Math.max(0, 30 * 60 - elapsedSec);
-                const mins = Math.floor(remainingSec / 60);
-                const secs = remainingSec % 60;
-                const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                const isDanger = remainingSec <= 300;
+                const countdown = getLeadCountdown(selectedLead);
+                if (!countdown) return null;
 
                 return (
                   <div className={`p-4 rounded-2xl border flex items-center justify-between mb-6 ${
-                    isDanger ? 'bg-rose-50 border-rose-200 text-rose-900 animate-pulse' : 'bg-amber-50 border-amber-200 text-amber-900'
+                    countdown.isDanger ? 'bg-rose-50 border-rose-200 text-rose-900 animate-pulse' : 'bg-amber-50 border-amber-200 text-amber-900'
                   }`}>
                     <div className="flex items-center gap-3">
-                      <Clock className={`w-5 h-5 ${isDanger ? 'text-rose-600' : 'text-amber-600'}`} />
+                      <Clock className={`w-5 h-5 ${countdown.isDanger ? 'text-rose-600' : 'text-amber-600'}`} />
                       <div>
                         <p className="font-bold text-sm">Hạn cập nhật thông tin khách hàng</p>
                       </div>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
-                      isDanger ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
+                      countdown.isDanger ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
                     }`}>
-                      {formatted}
+                      {countdown.formatted}
                     </span>
                   </div>
                 );
@@ -1747,14 +1771,30 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </button>
                 </div>
 
-                {/* Input Trao Đổi Đặt Ở Đầu Danh Sách */}
-                <div className="flex gap-2 mb-3">
-                  <input 
-                    type="text" 
-                    value={newNote}
-                    onChange={e => setNewNote(e.target.value)}
-                    onKeyPress={async (e) => {
-                      if (e.key === 'Enter' && newNote.trim()) {
+                {/* Input Trao Đổi Đặt Ở Đầu Danh Sách - Chỉ hiển thị khi đã cập nhật trạng thái ít nhất 1 lần */}
+                {(getStatusUpdateCount(selectedLead.history) > 0 || (selectedLead.status && selectedLead.status !== 'Chưa liên hệ') || Boolean(selectedLead.isUpdatedByAssignee)) && (
+                  <div className="flex gap-2 mb-3">
+                    <input 
+                      type="text" 
+                      value={newNote}
+                      onChange={e => setNewNote(e.target.value)}
+                      onKeyPress={async (e) => {
+                        if (e.key === 'Enter' && newNote.trim()) {
+                          const timestamp = new Date().toLocaleString('vi-VN');
+                          const username = user.displayName || user.email;
+                          const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
+                          const updatedHistory = [...(selectedLead.history || []), entry];
+                          await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
+                          setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
+                          setNewNote('');
+                        }
+                      }}
+                      placeholder="Nhập nội dung trao đổi..."
+                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm shadow-2xs bg-white"
+                    />
+                    <button 
+                      onClick={async () => {
+                        if (!newNote.trim()) return;
                         const timestamp = new Date().toLocaleString('vi-VN');
                         const username = user.displayName || user.email;
                         const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
@@ -1762,27 +1802,13 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                         await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
                         setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
                         setNewNote('');
-                      }
-                    }}
-                    placeholder="Nhập nội dung trao đổi..."
-                    className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm shadow-2xs bg-white"
-                  />
-                  <button 
-                    onClick={async () => {
-                      if (!newNote.trim()) return;
-                      const timestamp = new Date().toLocaleString('vi-VN');
-                      const username = user.displayName || user.email;
-                      const entry = `[NOTE][${timestamp}] ${username}: ${newNote.trim()}`;
-                      const updatedHistory = [...(selectedLead.history || []), entry];
-                      await updateLead(selectedLead.id, { history: updatedHistory }, user.email);
-                      setSelectedLead(prev => prev ? { ...prev, history: updatedHistory } : null);
-                      setNewNote('');
-                    }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all cursor-pointer shadow-sm shadow-emerald-200"
-                  >
-                    Gửi
-                  </button>
-                </div>
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all cursor-pointer shadow-sm shadow-emerald-200"
+                    >
+                      Gửi
+                    </button>
+                  </div>
+                )}
 
                 {/* Danh Sách Timeline */}
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
