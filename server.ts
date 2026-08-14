@@ -46,7 +46,7 @@ function getServiceAccount() {
     if (fs.existsSync(saPath)) {
       try {
         return JSON.parse(fs.readFileSync(saPath, 'utf8'));
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 
@@ -54,8 +54,8 @@ function getServiceAccount() {
   const envPrivateKey = process.env.FIREBASE_PRIVATE_KEY
     ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
     : (process.env.FIREBASE_PRIVATE_KEY_BASE64
-        ? Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8')
-        : undefined);
+      ? Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8')
+      : undefined);
 
   if (envPrivateKey && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PROJECT_ID) {
     return {
@@ -113,7 +113,7 @@ function getFirebaseAdminMessaging(): Messaging | null {
           private_key: privateKey,
           client_email: clientEmail,
         }, null, 2), 'utf8');
-      } catch (e) {}
+      } catch (e) { }
     }
     if (fs.existsSync(saPath)) {
       process.env.GOOGLE_APPLICATION_CREDENTIALS = saPath;
@@ -226,7 +226,7 @@ async function deleteFcmTokens(staleIds: string[]) {
   }
 }
 
-const DEFAULT_ZALO_GROUP_ID = '1983318870321097523';
+const DEFAULT_ZALO_GROUP_ID = '4814904778699793764';
 
 async function sendZaloWebhookNotification(emailOrUserId: string, message: string) {
   if (!emailOrUserId || !message) return;
@@ -604,7 +604,7 @@ async function checkAndRevokeOverdueLeads() {
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS isUpdatedByAssignee TINYINT(1) DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS useridzalo VARCHAR(255);
-    `).catch(() => {});
+    `).catch(() => { });
 
     // 2. Find leads assigned > 10 minutes ago where isUpdatedByAssignee is false/0
     const [rows] = await dbPool.query<mysql.RowDataPacket[]>(`
@@ -636,7 +636,7 @@ async function checkAndRevokeOverdueLeads() {
         if (lead.history) {
           try {
             historyList = typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history;
-          } catch(e) {}
+          } catch (e) { }
         }
         if (!Array.isArray(historyList)) historyList = [];
 
@@ -670,7 +670,7 @@ async function checkAndRevokeOverdueLeads() {
                   title: 'Thu hồi khách hàng ⚠️',
                   body: `Khách hàng ${customerName} đã bị thu hồi do quá 30 phút không cập nhật thông tin.`
                 }
-              }).catch(() => {});
+              }).catch(() => { });
             }
 
             // 2. Send push to assigner to reassign (keep SĐT for assigner)
@@ -687,7 +687,7 @@ async function checkAndRevokeOverdueLeads() {
                     title: 'Khách hàng bị thu hồi - Cần chia lại 🔄',
                     body: `Khách hàng ${customerName} (${phone}) đã bị thu hồi từ ${revokedEmail} do quá 30 phút. Vui lòng vào phân công lại.`
                   }
-                }).catch(() => {});
+                }).catch(() => { });
               }
             }
           }

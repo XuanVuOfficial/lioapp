@@ -72,11 +72,24 @@ export const createLead = async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedA
     const _assignedTo = newLead.assignedToEmail;
     const _name = newLead.customerName;
     const _creator = newLead.creatorEmail;
+    const _projectId = newLead.projectId;
     Promise.resolve().then(async () => {
       try {
+        let projectName = '';
+        if (_projectId) {
+          try {
+            const pData = await queryDB(`SELECT name FROM projects WHERE id = ${escapeSQL(_projectId)} LIMIT 1`);
+            if (pData && pData.length > 0 && pData[0].name) {
+              projectName = pData[0].name;
+            }
+          } catch (e) {}
+        }
+        const projDisplay = projectName ? projectName : 'chưa xác định';
+        const notificationMsg = `Bạn vừa nhận được data lead mới thuộc dự án ${projDisplay}\n\nBạn có 30 phút để cập nhật phản hồi lần 1!`;
+
         const { sendPushNotification } = await import('./notificationService');
-        sendPushNotification(_assignedTo, 'Khách hàng mới được giao 💼', `Bạn vừa được giao khách hàng ${_name} bởi ${_creator}`).catch(() => {});
-        sendZaloNotification(_assignedTo, `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${_name}`).catch(() => {});
+        sendPushNotification(_assignedTo, 'Data lead mới 💼', notificationMsg).catch(() => {});
+        sendZaloNotification(_assignedTo, notificationMsg).catch(() => {});
       } catch (err) {
         console.error('Error sending notification for new lead:', err);
       }
@@ -131,11 +144,12 @@ export const updateLead = async (id: string, updates: Partial<Lead>, userEmail: 
 
 export const assignLead = async (id: string, assignedToEmail: string | undefined, departmentId: string | undefined, userEmail: string): Promise<void> => {
   const now = new Date().toISOString();
-  const dataList = await queryDB(`SELECT customerName, phone, assignedToEmail, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
+  const dataList = await queryDB(`SELECT customerName, phone, assignedToEmail, projectId, history FROM leads WHERE id = ${escapeSQL(id)} LIMIT 1`);
   let currentHistory: string[] = [];
   let customerName = 'Khách hàng';
   let phone = '';
   let prevAssignedToEmail = '';
+  let leadProjectId = '';
 
   if (dataList && dataList.length > 0) {
     if (dataList[0].history) {
@@ -144,6 +158,7 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
     if (dataList[0].customerName) customerName = dataList[0].customerName;
     if (dataList[0].phone) phone = dataList[0].phone;
     if (dataList[0].assignedToEmail) prevAssignedToEmail = dataList[0].assignedToEmail;
+    if (dataList[0].projectId) leadProjectId = dataList[0].projectId;
   }
 
   const timestamp = new Date(now).toLocaleString('vi-VN');
@@ -187,6 +202,7 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
   const _newEmail = assignedToEmail;
   const _custName = customerName;
   const _byEmail = userEmail;
+  const _projId = leadProjectId;
   Promise.resolve().then(async () => {
     try {
       const { sendPushNotification } = await import('./notificationService');
@@ -198,8 +214,20 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
 
       // 2. Push & Zalo notification to newly assigned staff (no SĐT)
       if (_newEmail && _newEmail.toLowerCase() !== _prevEmail.toLowerCase()) {
-        sendPushNotification(_newEmail, 'Khách hàng mới được giao 💼', `Bạn vừa được giao khách hàng ${_custName} bởi ${_byEmail}`).catch(() => {});
-        sendZaloNotification(_newEmail, `[HKTT CRM] Bạn vừa được phân công phụ trách khách hàng: ${_custName}`).catch(() => {});
+        let projectName = '';
+        if (_projId) {
+          try {
+            const pData = await queryDB(`SELECT name FROM projects WHERE id = ${escapeSQL(_projId)} LIMIT 1`);
+            if (pData && pData.length > 0 && pData[0].name) {
+              projectName = pData[0].name;
+            }
+          } catch (e) {}
+        }
+        const projDisplay = projectName ? projectName : 'chưa xác định';
+        const notificationMsg = `Bạn vừa nhận được data lead mới thuộc dự án ${projDisplay}\n\nBạn có 30 phút để cập nhật phản hồi lần 1!`;
+
+        sendPushNotification(_newEmail, 'Data lead mới 💼', notificationMsg).catch(() => {});
+        sendZaloNotification(_newEmail, notificationMsg).catch(() => {});
       }
     } catch (err) {
       console.error('Error sending notifications on assignLead:', err);
