@@ -229,7 +229,7 @@ async function deleteFcmTokens(staleIds: string[]) {
   }
 }
 
-const DEFAULT_ZALO_GROUP_ID = '1983318870321097523';
+const DEFAULT_ZALO_GROUP_ID = '4814904778699793764';
 
 async function sendZaloWebhookNotification(emailOrUserId: string, message: string) {
   if (!emailOrUserId || !message) return;
