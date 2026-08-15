@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { Lead, Department } from '../types';
+import { Lead, Department, UserProfile } from '../types';
 
 /**
  * Parses a date string and returns a formatted date DD/MM/YYYY
@@ -19,18 +19,41 @@ const formatDate = (dateStr?: string): string => {
   }
 };
 
+/**
+ * Parses a date string and returns a formatted date time HH:mm DD/MM/YYYY
+ */
+const formatDateTime = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const mins = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${mins} ${day}/${month}/${year}`;
+  } catch {
+    return '';
+  }
+};
+
 interface ExportParams {
   leads: Lead[];
   departments: Department[];
+  staff?: UserProfile[];
   selectedDeptId?: string;
   projectName?: string;
+  staffName?: string;
 }
 
 export const exportLeadsToExcel = async ({
   leads,
   departments,
+  staff = [],
   selectedDeptId,
-  projectName
+  projectName,
+  staffName
 }: ExportParams) => {
   // Create workbook and worksheet
   const workbook = new ExcelJS.Workbook();
@@ -54,7 +77,7 @@ export const exportLeadsToExcel = async ({
     }
   }
 
-  // 2. Determine title based on selected department or default
+  // 2. Determine title based on selected department, project, staff or default
   let title = 'DANH SÁCH DATA TỔNG SÀN THIÊN LONG';
   if (selectedDeptId) {
     const dept = departments.find(d => d.id === selectedDeptId);
@@ -65,13 +88,19 @@ export const exportLeadsToExcel = async ({
   if (projectName) {
     title += ` - DỰ ÁN ${projectName.toUpperCase()}`;
   }
+  if (staffName) {
+    title += ` - NHÂN VIÊN: ${staffName.toUpperCase()}`;
+  }
 
   // Define column dimensions and settings
   worksheet.columns = [
     { key: 'stt', width: 6 },
-    { key: 'customerName', width: 28 },
+    { key: 'customerName', width: 26 },
     { key: 'phone', width: 16 },
     { key: 'createdAt', width: 16 },
+    { key: 'assignedBy', width: 22 },
+    { key: 'assignedTo', width: 22 },
+    { key: 'assignedAt', width: 20 },
     { key: 'status_contacted', width: 14 },
     { key: 'status_uncontacted', width: 16 },
     { key: 'status_met', width: 12 },
@@ -82,9 +111,9 @@ export const exportLeadsToExcel = async ({
     { key: 'feedback', width: 40 }
   ];
 
-  // 3. Merging header zones as per screenshot
-  // Left Section (Logo Area): Merge A1:C2
-  worksheet.mergeCells('A1:C2');
+  // 3. Merging header zones
+  // Left Section (Logo Area): Merge A1:D2
+  worksheet.mergeCells('A1:D2');
   const logoCell = worksheet.getCell('A1');
   logoCell.value = 'THIÊN LONG\nTỔNG SÀN GIAO DỊCH BĐS';
   logoCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -92,24 +121,24 @@ export const exportLeadsToExcel = async ({
   logoCell.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'E2EFDA' } // Light soft pastel green/blue as requested
+    fgColor: { argb: 'E2EFDA' }
   };
 
-  // Right Section Row 1 (Title): Merge D1:L1
-  worksheet.mergeCells('D1:L1');
-  const titleCell = worksheet.getCell('D1');
+  // Right Section Row 1 (Title): Merge E1:O1
+  worksheet.mergeCells('E1:O1');
+  const titleCell = worksheet.getCell('E1');
   titleCell.value = title;
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
-  titleCell.font = { name: 'Times New Roman', size: 15, bold: true, color: { argb: '000000' } };
+  titleCell.font = { name: 'Times New Roman', size: 14, bold: true, color: { argb: '000000' } };
   titleCell.fill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'FCE4D6' } // Peach/apricot background
   };
 
-  // Right Section Row 2 (Date range): Merge D2:L2
-  worksheet.mergeCells('D2:L2');
-  const dateCell = worksheet.getCell('D2');
+  // Right Section Row 2 (Date range): Merge E2:O2
+  worksheet.mergeCells('E2:O2');
+  const dateCell = worksheet.getCell('E2');
   dateCell.value = `(Từ ngày ${minDateStr} đến ngày ${maxDateStr})`;
   dateCell.alignment = { vertical: 'middle', horizontal: 'center' };
   dateCell.font = { name: 'Times New Roman', size: 11, italic: true, color: { argb: '000000' } };
@@ -119,16 +148,16 @@ export const exportLeadsToExcel = async ({
     fgColor: { argb: 'D9E1F2' } // Light greyish-blue background
   };
 
-  // Right Section Row 3 (KẾT QUẢ category title over E3:K3)
-  worksheet.mergeCells('E3:K3');
-  const resultHeaderCell = worksheet.getCell('E3');
+  // Right Section Row 3 (KẾT QUẢ category title over H3:N3)
+  worksheet.mergeCells('H3:N3');
+  const resultHeaderCell = worksheet.getCell('H3');
   resultHeaderCell.value = 'KẾT QUẢ';
   resultHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
   resultHeaderCell.font = { name: 'Times New Roman', size: 11, bold: true, color: { argb: '000000' } };
   resultHeaderCell.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'D9E1F2' } // Light greyish-blue background
+    fgColor: { argb: 'D9E1F2' }
   };
 
   // 4. Merge non-result headers vertically (Row 3 to Row 4)
@@ -148,19 +177,31 @@ export const exportLeadsToExcel = async ({
   const dateHeader = worksheet.getCell('D3');
   dateHeader.value = 'NGÀY PHÁT HÀNH';
 
-  worksheet.mergeCells('L3:L4');
-  const feedbackHeader = worksheet.getCell('L3');
+  worksheet.mergeCells('E3:E4');
+  const assignerHeader = worksheet.getCell('E3');
+  assignerHeader.value = 'NGƯỜI CHIA DATA';
+
+  worksheet.mergeCells('F3:F4');
+  const assigneeHeader = worksheet.getCell('F3');
+  assigneeHeader.value = 'NGƯỜI NHẬN DATA';
+
+  worksheet.mergeCells('G3:G4');
+  const assignTimeHeader = worksheet.getCell('G3');
+  assignTimeHeader.value = 'THỜI GIAN NHẬN';
+
+  worksheet.mergeCells('O3:O4');
+  const feedbackHeader = worksheet.getCell('O3');
   feedbackHeader.value = 'PHẢN HỒI CHUNG';
 
   // 5. Setup Row 4 values for category subheaders
   const row4 = worksheet.getRow(4);
-  row4.getCell('E').value = 'ĐÃ LIÊN HỆ';
-  row4.getCell('F').value = 'CHƯA LIÊN HỆ';
-  row4.getCell('G').value = 'ĐÃ GẶP';
-  row4.getCell('H').value = 'ĐÃ XEM NHÀ MẪU';
-  row4.getCell('I').value = 'ĐÃ CỌC';
-  row4.getCell('J').value = 'ĐÃ BOOKING';
-  row4.getCell('K').value = 'KHÔNG NHU CẦU';
+  row4.getCell('H').value = 'ĐÃ LIÊN HỆ';
+  row4.getCell('I').value = 'CHƯA LIÊN HỆ';
+  row4.getCell('J').value = 'ĐÃ GẶP';
+  row4.getCell('K').value = 'ĐÃ XEM NHÀ MẪU';
+  row4.getCell('L').value = 'ĐÃ CỌC';
+  row4.getCell('M').value = 'ĐÃ BOOKING';
+  row4.getCell('N').value = 'KHÔNG NHU CẦU';
 
   // Format all header cells in Row 3 and Row 4
   const headerFill: ExcelJS.Fill = {
@@ -183,8 +224,9 @@ export const exportLeadsToExcel = async ({
 
   const headerCellsToFormat = [
     'A3', 'A4', 'B3', 'B4', 'C3', 'C4', 'D3', 'D4',
-    'E3', 'E4', 'F4', 'G4', 'H4', 'I4', 'J4', 'K4',
-    'L3', 'L4'
+    'E3', 'E4', 'F3', 'F4', 'G3', 'G4',
+    'H3', 'H4', 'I4', 'J4', 'K4', 'L4', 'M4', 'N4',
+    'O3', 'O4'
   ];
 
   headerCellsToFormat.forEach(ref => {
@@ -199,14 +241,21 @@ export const exportLeadsToExcel = async ({
 
   // Apply borders specifically to merged logo & title blocks as well
   const titleAndLogoCells = [
-    'A1', 'B1', 'C1', 'A2', 'B2', 'C2',
-    'D1', 'E1', 'F1', 'G1', 'H1', 'I1', 'J1', 'K1', 'L1',
-    'D2', 'E2', 'F2', 'G2', 'H2', 'I2', 'J2', 'K2', 'L2'
+    'A1', 'B1', 'C1', 'D1', 'A2', 'B2', 'C2', 'D2',
+    'E1', 'F1', 'G1', 'H1', 'I1', 'J1', 'K1', 'L1', 'M1', 'N1', 'O1',
+    'E2', 'F2', 'G2', 'H2', 'I2', 'J2', 'K2', 'L2', 'M2', 'N2', 'O2'
   ];
   titleAndLogoCells.forEach(ref => {
     const cell = worksheet.getCell(ref);
     cell.border = headerBorder as any;
   });
+
+  const getStaffDisplayName = (email?: string): string => {
+    if (!email) return '';
+    const cleanEmail = email.trim().toLowerCase();
+    const found = staff.find(s => s.email && s.email.trim().toLowerCase() === cleanEmail);
+    return found ? found.displayName : email;
+  };
 
   // 6. Populate Data starting from row 5
   let currentRowNum = 5;
@@ -223,23 +272,30 @@ export const exportLeadsToExcel = async ({
     const isBooked = lead.resultStatus === 'Đã booking';
     const isNoDemand = lead.subStatus === 'Rác / Không quan tâm';
 
+    const assignerName = getStaffDisplayName(lead.assignedByEmail || lead.creatorEmail);
+    const assigneeName = lead.assignedToEmail ? getStaffDisplayName(lead.assignedToEmail) : 'Chưa phân chia';
+    const assignedTimeStr = lead.assignedAt ? formatDateTime(lead.assignedAt) : (lead.assignedToEmail ? formatDateTime(lead.createdAt) : '');
+
     // Populate columns
     row.getCell('A').value = index + 1; // STT
     row.getCell('B').value = lead.customerName; // Name
     row.getCell('C').value = lead.phone; // Phone
     row.getCell('D').value = formatDate(lead.createdAt); // Date
+    row.getCell('E').value = assignerName; // Người chia
+    row.getCell('F').value = assigneeName; // Người nhận
+    row.getCell('G').value = assignedTimeStr; // Thời gian nhận
 
     // Status columns with "X" mark if true
-    row.getCell('E').value = isContacted ? 'X' : '';
-    row.getCell('F').value = isUncontacted ? 'X' : '';
-    row.getCell('G').value = isMet ? 'X' : '';
-    row.getCell('H').value = isViewed ? 'X' : '';
-    row.getCell('I').value = isDeposited ? 'X' : '';
-    row.getCell('J').value = isBooked ? 'X' : '';
-    row.getCell('K').value = isNoDemand ? 'X' : '';
+    row.getCell('H').value = isContacted ? 'X' : '';
+    row.getCell('I').value = isUncontacted ? 'X' : '';
+    row.getCell('J').value = isMet ? 'X' : '';
+    row.getCell('K').value = isViewed ? 'X' : '';
+    row.getCell('L').value = isDeposited ? 'X' : '';
+    row.getCell('M').value = isBooked ? 'X' : '';
+    row.getCell('N').value = isNoDemand ? 'X' : '';
 
     // Feedback notes: combine substatus / appointment details if helpful, or fallback to main details/notes
-    row.getCell('L').value = lead.notes || lead.details || '';
+    row.getCell('O').value = lead.notes || lead.details || '';
 
     // Style data row cells
     row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -253,16 +309,19 @@ export const exportLeadsToExcel = async ({
       } else if (colNumber === 2) {
         // Name left aligned
         cell.alignment = { vertical: 'middle', horizontal: 'left' };
-      } else if (colNumber === 3 || colNumber === 4) {
-        // Phone and Date centered
+      } else if (colNumber === 3 || colNumber === 4 || colNumber === 7) {
+        // Phone, Date, Assigned Time centered
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      } else if (colNumber >= 5 && colNumber <= 11) {
+      } else if (colNumber === 5 || colNumber === 6) {
+        // Assigner, Assignee left aligned
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      } else if (colNumber >= 8 && colNumber <= 14) {
         // Status columns centered and styled green bold if "X"
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         if (cell.value === 'X') {
           cell.font = { name: 'Times New Roman', size: 10, bold: true, color: { argb: '107C41' } }; // Excel green
         }
-      } else if (colNumber === 12) {
+      } else if (colNumber === 15) {
         // Feedback left aligned, wrap text enabled
         cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
       }
@@ -287,7 +346,8 @@ export const exportLeadsToExcel = async ({
   // Create filename with current date
   const today = new Date();
   const dateFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const filename = `Bao_Cao_Khach_Hang_${dateFormatted}.xlsx`;
+  const staffSuffix = staffName ? `_${staffName.replace(/\s+/g, '_')}` : '';
+  const filename = `Bao_Cao_Khach_Hang${staffSuffix}_${dateFormatted}.xlsx`;
   
   saveAs(blob, filename);
 };

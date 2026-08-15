@@ -63,6 +63,12 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
   const [exportStartDate, setExportStartDate] = useState<string>('');
   const [exportEndDate, setExportEndDate] = useState<string>('');
   const [presetSelected, setPresetSelected] = useState<string>('month');
+  const [exportStaffEmail, setExportStaffEmail] = useState<string>('');
+
+  // Staff Filter Modal State
+  const [selectedStaffEmail, setSelectedStaffEmail] = useState<string>('');
+  const [showStaffFilterModal, setShowStaffFilterModal] = useState(false);
+  const [staffFilterSearch, setStaffFilterSearch] = useState('');
 
   // Stats Date Filter State
   const [statsStartDate, setStatsStartDate] = useState<string>('');
@@ -300,6 +306,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   const handleOpenExportModal = () => {
     applyPreset('month');
+    setExportStaffEmail(selectedStaffEmail);
     setShowExportModal(true);
   };
 
@@ -366,6 +373,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         projectId: selectedProjectId,
         assignFilter,
         searchTerm,
+        staffEmail: selectedStaffEmail || undefined,
         startDate: statsStartDate || undefined,
         endDate: statsEndDate || undefined
       });
@@ -373,7 +381,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     } catch (e) {
       console.error('Error fetching stats:', e);
     }
-  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, assignFilter, searchTerm, statsStartDate, statsEndDate]);
+  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, assignFilter, searchTerm, selectedStaffEmail, statsStartDate, statsEndDate]);
 
   useEffect(() => {
     if (showStats) {
@@ -430,6 +438,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         status: currentTab,
         assignFilter,
         searchTerm,
+        staffEmail: selectedStaffEmail || undefined,
         page: 1,
         limit: 20
       });
@@ -444,7 +453,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         setIsLoadingLeads(false);
       }
     }
-  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm]);
+  }, [user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm, selectedStaffEmail]);
 
   useEffect(() => {
     loadTabLeads(false);
@@ -489,6 +498,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         status: currentTab,
         assignFilter,
         searchTerm,
+        staffEmail: selectedStaffEmail || undefined,
         page: nextPage,
         limit: 20
       });
@@ -506,7 +516,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, isLoadingLeads, hasMore, page, user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm]);
+  }, [isLoadingMore, isLoadingLeads, hasMore, page, user.role, user.email, activeSubDeptIds, selectedProjectId, currentTab, assignFilter, searchTerm, selectedStaffEmail]);
 
   // Infinite scroll IntersectionObserver
   useEffect(() => {
@@ -543,6 +553,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         status: currentTab,
         assignFilter,
         searchTerm,
+        staffEmail: exportStaffEmail || undefined,
         page: 1,
         limit: 5000
       });
@@ -575,11 +586,14 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
         return;
       }
       const projName = projects.find(p => p.id === selectedProjectId)?.name;
+      const targetStaff = staff.find(s => s.email.toLowerCase() === exportStaffEmail.toLowerCase());
       await exportLeadsToExcel({
         leads: leadsToExport,
         departments,
+        staff,
         selectedDeptId,
-        projectName: projName
+        projectName: projName,
+        staffName: targetStaff ? targetStaff.displayName : undefined
       });
       setShowExportModal(false);
     } catch (e: any) {
@@ -771,6 +785,21 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
     return staff.filter(s => s.departmentId && validDeptIds.includes(s.departmentId));
   }, [staff, user.role, allowedDepartments]);
 
+  const filterableStaff = React.useMemo(() => {
+    if (['tgd', 'admin'].includes(user.role)) {
+      if (selectedDeptId) {
+        const subIds = getSubDeptIdsRecursive(selectedDeptId);
+        return staff.filter(s => s.departmentId && subIds.includes(s.departmentId));
+      }
+      return staff;
+    }
+    if (['gds', 'tp'].includes(user.role)) {
+      const validDeptIds = activeSubDeptIds;
+      return staff.filter(s => s.departmentId && validDeptIds.includes(s.departmentId));
+    }
+    return staff.filter(s => s.email.toLowerCase() === user.email.toLowerCase());
+  }, [staff, user.role, user.email, selectedDeptId, activeSubDeptIds, getSubDeptIdsRecursive]);
+
   const getRoleName = (role: string) => {
     switch (role) {
       case 'tgd': return 'Tổng giám đốc';
@@ -784,83 +813,151 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         <h2 className="text-xl md:text-2xl font-bold text-slate-900">Khách hàng tiềm năng</h2>
-        <div className="flex flex-col sm:flex-row w-full md:w-auto gap-2 md:gap-3">
-          {/* Department Filter */}
-          <div className="relative flex-1 md:w-48">
-            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <select
-              value={selectedDeptId}
-              onChange={(e) => setSelectedDeptId(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none bg-white"
-            >
-              {['tgd', 'admin'].includes(user.role) && (
-                <option value="">Tất cả phòng ban</option>
-              )}
-              {allowedDepartments.map(d => (
-                <option key={d.id} value={d.id}>{getDepartmentPath(d.id)}</option>
-              ))}
-            </select>
+        <div className="flex flex-col md:flex-row w-full md:w-auto items-stretch md:items-center gap-2 md:gap-3">
+          {/* Dropdown filters: 2 columns on mobile */}
+          <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:gap-3">
+            {/* Department Filter */}
+            <div className="relative flex-1 md:w-44">
+              <Briefcase className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={selectedDeptId}
+                onChange={(e) => {
+                  setSelectedDeptId(e.target.value);
+                  setSelectedStaffEmail('');
+                }}
+                className="w-full pl-8 sm:pl-10 pr-2 sm:pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none bg-white truncate"
+              >
+                {['tgd', 'admin'].includes(user.role) && (
+                  <option value="">Tất cả phòng ban</option>
+                )}
+                {allowedDepartments.map(d => (
+                  <option key={d.id} value={d.id}>{getDepartmentPath(d.id)}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Assignment Filter for Managers */}
+            <div className="relative flex-1 md:w-44">
+              <User className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={assignFilter}
+                onChange={(e) => setAssignFilter(e.target.value as 'all' | 'mine' | 'assigned_by_me')}
+                disabled={user.role === 'staff'}
+                className={`w-full pl-8 sm:pl-10 pr-2 sm:pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 outline-none transition-all appearance-none bg-white truncate ${user.role === 'staff' ? 'bg-slate-50 cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-emerald-500'
+                  }`}
+              >
+                {user.role !== 'staff' && <option value="all">Tất cả</option>}
+                <option value="mine">Tôi đảm nhận</option>
+                {user.role !== 'staff' && <option value="assigned_by_me">Tôi đã chia cho nhân viên</option>}
+              </select>
+            </div>
           </div>
 
-          {/* Assignment Filter for Managers */}
-          <div className="relative flex-1 md:w-48">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <select
-              value={assignFilter}
-              onChange={(e) => setAssignFilter(e.target.value as 'all' | 'mine' | 'assigned_by_me')}
-              disabled={user.role === 'staff'}
-              className={`w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 outline-none transition-all appearance-none bg-white ${user.role === 'staff' ? 'bg-slate-50 cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-emerald-500'
-                }`}
-            >
-              {user.role !== 'staff' && <option value="all">Tất cả</option>}
-              <option value="mine">Tôi đảm nhận</option>
-              {user.role !== 'staff' && <option value="assigned_by_me">Tôi đã chia cho nhân viên</option>}
-            </select>
-          </div>
+          {/* Staff Filter Button (Opens Staff Search Modal) */}
+          {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
+            <div className="relative w-full md:w-48">
+              <button
+                type="button"
+                onClick={() => {
+                  setStaffFilterSearch('');
+                  setShowStaffFilterModal(true);
+                }}
+                className={`w-full flex items-center justify-between pl-3 pr-2.5 py-2 text-xs sm:text-sm rounded-xl border transition-all text-left truncate cursor-pointer ${selectedStaffEmail
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold shadow-2xs'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
+                  }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 truncate">
+                  <User className={`w-3.5 sm:w-4 h-3.5 sm:h-4 shrink-0 ${selectedStaffEmail ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <span className="truncate">
+                    {selectedStaffEmail
+                      ? (staff.find(s => s.email.toLowerCase() === selectedStaffEmail.toLowerCase())?.displayName || selectedStaffEmail)
+                      : 'Lọc theo nhân viên'}
+                  </span>
+                </div>
+                {selectedStaffEmail ? (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedStaffEmail('');
+                    }}
+                    className="p-0.5 text-emerald-600 hover:text-rose-600 hover:bg-rose-50 rounded shrink-0 ml-1 transition-colors"
+                    title="Bỏ lọc nhân viên"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </span>
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+                )}
+              </button>
+            </div>
+          )}
 
-          <div className="relative flex-1 md:w-64">
+          {/* Search Input */}
+          <div className="relative flex-1 md:w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm kiếm..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white"
             />
           </div>
-          <button
-            onClick={handleOpenExportModal}
-            className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl font-semibold text-sm transition-all shadow-sm"
-          >
-            <Download className="w-4 h-4" />
-            Xuất Excel
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-100"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm mới
-          </button>
+
+          {/* Action buttons: 2 columns on mobile (Xuất Excel và Thêm mới cùng 1 hàng) */}
+          <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:gap-3">
+            <button
+              onClick={handleOpenExportModal}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-white hover:bg-slate-50 text-emerald-600 border border-emerald-200 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all shadow-sm"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Xuất Excel</span>
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-100"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Thêm mới</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {selectedStaffEmail && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 animate-in fade-in duration-200">
+          <User className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span className="flex-1 truncate">
+            Đang lọc khách hàng của nhân viên: <strong>{staff.find(s => s.email.toLowerCase() === selectedStaffEmail.toLowerCase())?.displayName || selectedStaffEmail}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedStaffEmail('')}
+            className="text-xs font-semibold text-emerald-700 hover:text-rose-600 flex items-center gap-1 shrink-0 ml-1 cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+            <span>Xóa lọc</span>
+          </button>
+        </div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm"
+        className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-2 sm:gap-3 shadow-sm"
       >
-        <div className="flex items-center gap-2 w-full flex-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
             <FolderKanban className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="hidden sm:block text-sm text-slate-500 font-medium">Dự án:</p>
+          <p className="hidden sm:block text-sm text-slate-500 font-medium shrink-0">Dự án:</p>
           <select
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="flex-1 text-base font-bold text-slate-800 bg-transparent outline-none cursor-pointer hover:text-emerald-700 transition-colors"
+            className="flex-1 min-w-0 text-xs sm:text-base font-bold text-slate-800 bg-transparent outline-none cursor-pointer hover:text-emerald-700 transition-colors truncate"
           >
             <option value="">Tất cả dự án</option>
             {projects.map(p => (
@@ -869,7 +966,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
           </select>
         </div>
 
-        <div className="flex items-center w-full sm:w-auto">
+        <div className="flex items-center shrink-0">
           <button
             onClick={() => {
               const nextShow = !showStats;
@@ -878,19 +975,19 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 loadStats();
               }
             }}
-            className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm ${showStats
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm ${showStats
               ? 'bg-emerald-600 text-white'
               : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
               }`}
           >
             {showStats ? (
               <>
-                <List className="w-4 h-4" />
+                <List className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                 <span>Danh sách</span>
               </>
             ) : (
               <>
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                 <span>Thống kê</span>
               </>
             )}
@@ -2459,16 +2556,47 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                 </div>
               </div>
 
+              {/* Staff selection for export */}
+              {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Xuất theo nhân viên:
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={exportStaffEmail}
+                      onChange={e => setExportStaffEmail(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                    >
+                      <option value="">-- Tất cả nhân viên --</option>
+                      {filterableStaff.map(s => (
+                        <option key={s.uid} value={s.email}>
+                          {s.displayName} ({s.email}) {s.departmentId ? `- ${getDepartmentPath(s.departmentId)}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {/* Record count preview */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col gap-1 text-xs text-slate-600">
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600">
                 <div className="flex items-center justify-between">
                   <span>Phạm vi áp dụng:</span>
                   <span className="font-bold text-emerald-700">
                     Tab: {currentTab} {selectedProjectId ? `· ${projects.find(p => p.id === selectedProjectId)?.abbreviation || 'Dự án'}` : ''}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 italic mt-0.5">
-                  Dữ liệu sẽ được lọc đầy đủ theo thời gian, bộ lọc dự án/nhân viên và phân quyền ({getRoleName(user.role)}).
+                {exportStaffEmail && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span>Nhân viên xuất dữ liệu:</span>
+                    <span className="font-bold text-emerald-700">
+                      {staff.find(s => s.email.toLowerCase() === exportStaffEmail.toLowerCase())?.displayName || exportStaffEmail}
+                    </span>
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-500 italic mt-0.5 leading-relaxed">
+                  Tệp Excel sẽ tự động bổ sung cột: <strong>Người chia data</strong>, <strong>Người nhận data</strong>, <strong>Thời gian nhận</strong>, chi tiết trạng thái và phản hồi.
                 </p>
               </div>
             </div>
@@ -2501,6 +2629,130 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </>
                 )}
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Staff Filter Search Modal for Lead List */}
+      {showStaffFilterModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-200">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="bg-white rounded-2xl max-w-md w-full p-4 md:p-5 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]"
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <User className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Lọc theo nhân viên</h3>
+                  <p className="text-xs text-slate-500">Xem danh sách khách hàng của nhân viên</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowStaffFilterModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Tìm theo tên, email, phòng ban..."
+                value={staffFilterSearch}
+                onChange={e => setStaffFilterSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              />
+            </div>
+
+            {/* Option: Tất cả nhân viên (Reset filter) */}
+            <div className="mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedStaffEmail('');
+                  setShowStaffFilterModal(false);
+                }}
+                className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${!selectedStaffEmail
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold'
+                  : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">
+                    ALL
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Tất cả nhân viên</p>
+                    <p className="text-xs text-slate-500">Xem dữ liệu toàn bộ nhân viên</p>
+                  </div>
+                </div>
+                {!selectedStaffEmail && <Check className="w-4 h-4 text-emerald-600" />}
+              </button>
+            </div>
+
+            {/* Staff List */}
+            <div className="overflow-y-auto space-y-1.5 flex-1 pr-1">
+              {filterableStaff
+                .filter(s => {
+                  const matchName = s.displayName?.toLowerCase().includes(staffFilterSearch.toLowerCase());
+                  const matchEmail = s.email?.toLowerCase().includes(staffFilterSearch.toLowerCase());
+                  const deptPath = s.departmentId ? getDepartmentPath(s.departmentId) : '';
+                  const matchDept = deptPath.toLowerCase().includes(staffFilterSearch.toLowerCase());
+                  return matchName || matchEmail || matchDept;
+                })
+                .map(s => {
+                  const isSelected = selectedStaffEmail.toLowerCase() === s.email.toLowerCase();
+                  return (
+                    <button
+                      key={s.uid}
+                      type="button"
+                      onClick={() => {
+                        setSelectedStaffEmail(s.email);
+                        setShowStaffFilterModal(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${isSelected
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
+                        : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${isSelected ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+                          {s.avatarUrl ? (
+                            <img src={s.avatarUrl} alt={s.displayName} className="w-full h-full object-cover" />
+                          ) : (
+                            s.displayName?.[0]?.toUpperCase() || 'U'
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold text-sm truncate">{s.displayName}</p>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                              {getRoleName(s.role)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 truncate">{s.email}</p>
+                          {s.departmentId && (
+                            <p className="text-[11px] text-emerald-600 font-medium truncate mt-0.5">
+                              {getDepartmentPath(s.departmentId)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />}
+                    </button>
+                  );
+                })}
             </div>
           </motion.div>
         </div>

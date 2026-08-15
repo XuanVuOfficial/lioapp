@@ -1,0 +1,9 @@
+-- thêm 2 cột cho bảng leads
+ALTER TABLE `leads`
+ADD COLUMN `assignedAt` VARCHAR(50) DEFAULT NULL,
+ADD COLUMN `isUpdatedByAssignee` TINYINT(1) DEFAULT 0;
+
+
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS useridzalo VARCHAR(255);

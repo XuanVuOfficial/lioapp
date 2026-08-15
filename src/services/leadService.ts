@@ -283,6 +283,7 @@ export interface LeadFilterOptions {
   searchTerm?: string;
   selectedDeptId?: string;
   subDeptIds?: string[];
+  staffEmail?: string; // Filter by assigned staff email
   startDate?: string; // YYYY-MM-DD
   endDate?: string;   // YYYY-MM-DD
 }
@@ -317,6 +318,11 @@ export const buildBaseWhereClause = (options: LeadFilterOptions, includeStatus: 
     conditions.push(`departmentId IN (${ids})`);
   } else if (options.selectedDeptId) {
     conditions.push(`departmentId = ${escapeSQL(options.selectedDeptId)}`);
+  }
+
+  // Filter by specific staff member
+  if (options.staffEmail && options.staffEmail.trim() !== '') {
+    conditions.push(`assignedToEmail = ${escapeSQL(options.staffEmail.trim())}`);
   }
 
   // Project Filter
