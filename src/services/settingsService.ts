@@ -72,20 +72,8 @@ const parseSettings = (row: any): AppSettings => {
   return settings;
 };
 
-let hasEnsuredLockColumn = false;
-const ensureLockColumn = async () => {
-  if (hasEnsuredLockColumn) return;
-  try {
-    await queryDB(`ALTER TABLE settings ADD COLUMN lockPermissions JSON`);
-  } catch (e) {
-    // Column may already exist, ignore error
-  }
-  hasEnsuredLockColumn = true;
-};
-
 export const getAppSettings = async (): Promise<AppSettings> => {
   try {
-    await ensureLockColumn();
     const data = await queryDB(`SELECT * FROM settings WHERE id = ${escapeSQL(DOC_ID)} LIMIT 1`);
     if (data && data.length > 0) {
       return parseSettings(data[0]);
@@ -101,7 +89,6 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 };
 
 export const updateAppSettings = async (settings: AppSettings): Promise<void> => {
-  await ensureLockColumn();
   const zaloGroup = settings.zaloGroupId ? settings.zaloGroupId.trim() : '4814904778699793764';
   const lockPerms = settings.lockPermissions || { admin: true, tp: false, gds: false };
   await executeMutation(
