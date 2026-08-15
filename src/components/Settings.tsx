@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings as SettingsIcon, LayoutDashboard, UserPlus, Briefcase, Users, UserCircle, Save, Check, Bell, MessageCircle } from 'lucide-react';
+import { Settings as SettingsIcon, LayoutDashboard, UserPlus, Briefcase, Users, UserCircle, Save, Check, Bell, MessageCircle, Lock, AlertCircle } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { AppSettings, updateAppSettings, getAppSettings } from '../services/settingsService';
 
@@ -250,6 +250,111 @@ export const Settings: React.FC<Props> = ({ user }) => {
             <p className="text-xs text-slate-400">
               Mặc định: <code className="text-slate-600 font-mono font-semibold">4814904778699793764</code>
             </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Quyền Khóa / Mở khóa tài khoản */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+      >
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
+            <Lock className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900">Quyền Khóa / Mở khóa tài khoản nhân sự</h3>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Bật/tắt quyền khóa tài khoản cho từng vai trò quản lý.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5 leading-relaxed">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold mb-0.5">Quy tắc phân quyền bảo mật:</p>
+              <p>
+                Dù được cấp quyền, người dùng <strong>tuyệt đối không được phép khóa người cùng cấp hoặc cấp trên</strong> mà <strong>chỉ được khóa các nhân sự cấp dưới trực thuộc phạm vi quản lý</strong> của họ. Tổng giám đốc luôn có toàn quyền quản trị cao nhất.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            {[
+              {
+                id: 'admin',
+                label: 'Admin (Quản trị viên)',
+                desc: 'Được phép khóa/mở khóa tài khoản Giám đốc sàn, Trưởng phòng và Nhân viên. Không được khóa Admin khác hoặc TGĐ.',
+                defaultVal: true
+              },
+              {
+                id: 'tp',
+                label: 'Trưởng phòng (TP)',
+                desc: 'Được phép khóa/mở khóa tài khoản Nhân viên trực thuộc phòng ban của mình. Không được khóa Trưởng phòng khác hay cấp trên.',
+                defaultVal: false
+              },
+              {
+                id: 'gds',
+                label: 'Giám đốc sàn (GĐS)',
+                desc: 'Được phép khóa/mở khóa tài khoản Trưởng phòng và Nhân viên trực thuộc sàn do mình phụ trách.',
+                defaultVal: false
+              }
+            ].map(item => {
+              const isEnabled = settings.lockPermissions?.[item.id] ?? item.defaultVal;
+
+              return (
+                <div
+                  key={item.id}
+                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                    isEnabled
+                      ? 'border-emerald-200 bg-emerald-50/30'
+                      : 'border-slate-200 bg-slate-50/50'
+                  }`}
+                >
+                  <div className="space-y-1 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-slate-800">{item.label}</span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          isEnabled
+                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            : 'bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {isEnabled ? 'Được phép' : 'Đang tắt'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettings({
+                        ...settings,
+                        lockPermissions: {
+                          ...(settings.lockPermissions || { admin: true, tp: false, gds: false }),
+                          [item.id]: !isEnabled
+                        }
+                      });
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isEnabled ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        isEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </motion.div>

@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check, Lock, Unlock, Info, Upload } from 'lucide-react';
 import { UserProfile, Department, UserRole } from '../types';
 import { createStaffAccount, updateUserRole, deleteUser, updateUserProfile } from '../services/userService';
 import { updateDepartment } from '../services/departmentService';
-import { getAppSettings } from '../services/settingsService';
+import { getAppSettings, AppSettings } from '../services/settingsService';
 import { compressImage } from '../utils/imageUtils';
 
 interface Props {
@@ -15,6 +15,11 @@ interface Props {
 
 export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+
+  useEffect(() => {
+    getAppSettings().then(setAppSettings);
+  }, []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [infoUser, setInfoUser] = useState<UserProfile | null>(null);
@@ -463,12 +468,74 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     return false;
   };
 
-  const canToggleLock = (targetUser: UserProfile) => {
-    if (targetUser.uid === currentUser.uid) return false;
-    if (currentUser.role === 'tgd') return true;
-    if (currentUser.role === 'admin') {
-      return !['tgd', 'admin'].includes(targetUser.role);
+  const ROLE_HIERARCHY: Record<UserRole, number> = {
+    tgd: 5,
+    admin: 4,
+    gds: 3,
+    tp: 2,
+    staff: 1
+  };
+
+  const getSubDeptIdsRecursive = (deptId: string): string[] => {
+    const ids = [deptId];
+    departments.filter(d => d.parentId === deptId).forEach(child => {
+      ids.push(...getSubDeptIdsRecursive(child.id));
+    });
+    return ids;
+  };
+
+  const isUserUnderManagement = (targetUser: UserProfile): boolean => {
+    if (currentUser.role === 'tgd' || currentUser.role === 'admin') return true;
+    if (!targetUser.departmentId) return false;
+
+    const managedIds = new Set<string>();
+    if (currentUser.managedDeptIds && currentUser.managedDeptIds.length > 0) {
+      currentUser.managedDeptIds.forEach(id => {
+        getSubDeptIdsRecursive(id).forEach(subId => managedIds.add(subId));
+      });
     }
+    if (currentUser.departmentId) {
+      getSubDeptIdsRecursive(currentUser.departmentId).forEach(subId => managedIds.add(subId));
+    }
+
+    return managedIds.has(targetUser.departmentId);
+  };
+
+  const canToggleLock = (targetUser: UserProfile) => {
+    // 1. Không thể khóa chính mình
+    if (targetUser.uid === currentUser.uid) return false;
+
+    // 2. Không được khóa người cùng cấp hoặc cấp trên (Rank của người thao tác phải cao hơn đối tượng)
+    const currentRank = ROLE_HIERARCHY[currentUser.role] || 0;
+    const targetRank = ROLE_HIERARCHY[targetUser.role] || 0;
+    if (currentRank <= targetRank) return false;
+
+    // 3. TGĐ luôn có toàn quyền khóa/mở khóa các cấp dưới
+    if (currentUser.role === 'tgd') return true;
+
+    // 4. Kiểm tra cấu hình bật/tắt quyền khóa trong Cài đặt hệ thống
+    const lockPerms = appSettings?.lockPermissions;
+
+    // 5. Admin (QTV)
+    if (currentUser.role === 'admin') {
+      if (lockPerms?.admin === false) return false;
+      // Admin được khóa cấp dưới (gds, tp, staff)
+      return true;
+    }
+
+    // 6. Trưởng phòng (TP)
+    if (currentUser.role === 'tp') {
+      if (!lockPerms?.tp) return false;
+      // TP chỉ được khóa nhân viên cấp dưới trực thuộc quyền quản lý của mình
+      return isUserUnderManagement(targetUser);
+    }
+
+    // 7. Giám đốc sàn (GĐS)
+    if (currentUser.role === 'gds') {
+      if (!lockPerms?.gds && !lockPerms?.tp) return false;
+      return isUserUnderManagement(targetUser);
+    }
+
     return false;
   };
 

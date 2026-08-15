@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS settings (
     id VARCHAR(50) PRIMARY KEY,
     tabVisibility JSON,
     roleLimits JSON,
-    zaloGroupId VARCHAR(100)
+    zaloGroupId VARCHAR(100),
+    lockPermissions JSON
 );
 
 CREATE TABLE IF NOT EXISTS user_fcm_tokens (
