@@ -73,6 +73,33 @@ export const Settings: React.FC<Props> = ({ user }) => {
     });
   };
 
+  const [savingLockRoleId, setSavingLockRoleId] = useState<string | null>(null);
+
+  const handleToggleLockPermission = async (roleId: string, currentVal: boolean) => {
+    if (!settings) return;
+    const nextVal = !currentVal;
+    const newLockPerms = {
+      ...(settings.lockPermissions || { admin: true, tp: false, gds: false }),
+      [roleId]: nextVal
+    };
+    const updatedSettings: AppSettings = {
+      ...settings,
+      lockPermissions: newLockPerms
+    };
+    setSettings(updatedSettings);
+    setSavingLockRoleId(roleId);
+
+    try {
+      await updateAppSettings(updatedSettings);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+    } catch (err: any) {
+      alert('Lỗi lưu quyền khóa tài khoản: ' + (err?.message || err));
+    } finally {
+      setSavingLockRoleId(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!settings) return;
     setIsSaving(true);
@@ -319,13 +346,15 @@ export const Settings: React.FC<Props> = ({ user }) => {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-slate-800">{item.label}</span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                          isEnabled
-                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                            : 'bg-slate-200 text-slate-600'
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-all ${
+                          savingLockRoleId === item.id
+                            ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                            : isEnabled
+                              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-200 text-slate-600'
                         }`}
                       >
-                        {isEnabled ? 'Được phép' : 'Đang tắt'}
+                        {savingLockRoleId === item.id ? 'Đang lưu...' : isEnabled ? 'Được phép' : 'Đang tắt'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
@@ -333,18 +362,11 @@ export const Settings: React.FC<Props> = ({ user }) => {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSettings({
-                        ...settings,
-                        lockPermissions: {
-                          ...(settings.lockPermissions || { admin: true, tp: false, gds: false }),
-                          [item.id]: !isEnabled
-                        }
-                      });
-                    }}
+                    disabled={savingLockRoleId === item.id}
+                    onClick={() => handleToggleLockPermission(item.id, isEnabled)}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       isEnabled ? 'bg-emerald-600' : 'bg-slate-300'
-                    }`}
+                    } ${savingLockRoleId === item.id ? 'opacity-60 cursor-wait' : ''}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${

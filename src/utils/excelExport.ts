@@ -108,7 +108,7 @@ export const exportLeadsToExcel = async ({
     { key: 'status_deposited', width: 12 },
     { key: 'status_booked', width: 14 },
     { key: 'status_nodemand', width: 18 },
-    { key: 'feedback', width: 40 }
+    { key: 'feedback', width: 50 }
   ];
 
   // 3. Merging header zones
@@ -257,6 +257,99 @@ export const exportLeadsToExcel = async ({
     return found ? found.displayName : email;
   };
 
+  /**
+   * Tổng hợp đầy đủ: Trạng thái chi tiết + Ghi chú ban đầu + Lịch sử trao đổi/phản hồi
+   */
+  const formatLeadFeedback = (lead: Lead): string => {
+    const sections: string[] = [];
+
+    // 1. Chuỗi phân cấp trạng thái hiện tại (nếu có chi tiết)
+    const statusParts: string[] = [];
+    if (lead.status && lead.status !== 'Chưa liên hệ') statusParts.push(lead.status);
+    if (lead.subStatus) statusParts.push(lead.subStatus);
+    if (lead.appointmentStatus) statusParts.push(lead.appointmentStatus);
+    if (lead.resultStatus) statusParts.push(lead.resultStatus);
+
+    if (statusParts.length > 0) {
+      sections.push(`[Trạng thái]: ${statusParts.join(' > ')}`);
+    }
+
+    // 2. Ghi chú ban đầu
+    if (lead.notes && String(lead.notes).trim()) {
+      sections.push(`[Ghi chú ban đầu]: ${String(lead.notes).trim()}`);
+    } else if (lead.details && String(lead.details).trim()) {
+      sections.push(`[Ghi chú ban đầu]: ${String(lead.details).trim()}`);
+    }
+
+    // 3. Lịch sử trao đổi / phản hồi của nhân viên (từ lead.history)
+    let rawHistory: any = lead.history;
+    if (typeof rawHistory === 'string') {
+      try {
+        rawHistory = JSON.parse(rawHistory);
+      } catch {
+        rawHistory = [];
+      }
+    }
+
+    if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+      const feedbackEntries: string[] = [];
+
+      rawHistory.forEach(entry => {
+        if (typeof entry !== 'string') return;
+        const trimEntry = entry.trim();
+        if (!trimEntry) return;
+
+        // 3.1 Ghi chú trao đổi [NOTE]
+        if (trimEntry.startsWith('[NOTE]')) {
+          const clean = trimEntry.replace(/^\[NOTE\]/, '').trim();
+          const m = clean.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/);
+          if (m) {
+            const time = m[1].trim();
+            const actor = m[2].trim();
+            const note = m[3].trim();
+            feedbackEntries.push(`• [${time}] ${actor}: ${note}`);
+          } else {
+            feedbackEntries.push(`• ${clean}`);
+          }
+        }
+        // 3.2 Cập nhật trạng thái [LOG] có note hoặc ghi nhận hành động
+        else if (trimEntry.startsWith('[LOG]')) {
+          const clean = trimEntry.replace(/^\[LOG\]/, '').trim();
+          const noteMatch = clean.match(/\(note:\s*([^)]+)\)/i);
+          const m = clean.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/);
+          const time = m ? m[1].trim() : '';
+          const actor = m ? m[2].trim() : '';
+
+          if (noteMatch) {
+            const noteContent = noteMatch[1].trim();
+            const statusMatch = clean.match(/"([^"]+)"/);
+            const st = statusMatch ? `[${statusMatch[1]}] ` : '';
+            feedbackEntries.push(`• [${time}] ${actor}: ${st}Ghi chú: ${noteContent}`);
+          } else if (clean.toLowerCase().includes('cập nhật trạng thái')) {
+            const statusMatch = clean.match(/"([^"]+)"/);
+            if (statusMatch) {
+              feedbackEntries.push(`• [${time}] ${actor}: Cập nhật "${statusMatch[1]}"`);
+            } else {
+              feedbackEntries.push(`• [${time}] ${actor}: ${m ? m[3].trim() : clean}`);
+            }
+          } else if (clean.toLowerCase().includes('thu hồi')) {
+            feedbackEntries.push(`• [${time}] ${actor}: Đã thu hồi data`);
+          }
+        }
+        // 3.3 Chuỗi thông thường khác
+        else if (!trimEntry.toLowerCase().includes('người phụ trách:')) {
+          feedbackEntries.push(`• ${trimEntry}`);
+        }
+      });
+
+      if (feedbackEntries.length > 0) {
+        sections.push(`[Lịch sử trao đổi]:\n${feedbackEntries.join('\n')}`);
+      }
+    }
+
+    return sections.join('\n\n').trim();
+  };
+
   // 6. Populate Data starting from row 5
   let currentRowNum = 5;
 
@@ -294,8 +387,13 @@ export const exportLeadsToExcel = async ({
     row.getCell('M').value = isBooked ? 'X' : '';
     row.getCell('N').value = isNoDemand ? 'X' : '';
 
-    // Feedback notes: combine substatus / appointment details if helpful, or fallback to main details/notes
-    row.getCell('O').value = lead.notes || lead.details || '';
+    // Feedback notes: comprehensive feedback (status chain, initial notes, full history exchange)
+    const feedbackVal = formatLeadFeedback(lead);
+    row.getCell('O').value = feedbackVal;
+
+    // Dynamic row height for multiline feedback
+    const feedbackLines = feedbackVal ? feedbackVal.split('\n').length : 1;
+    row.height = Math.max(22, Math.min(220, feedbackLines * 16 + 6));
 
     // Style data row cells
     row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -330,14 +428,11 @@ export const exportLeadsToExcel = async ({
     currentRowNum++;
   });
 
-  // Set default height for all rows to look spacious
+  // Set default height for header rows
   worksheet.getRow(1).height = 25;
   worksheet.getRow(2).height = 22;
   worksheet.getRow(3).height = 22;
   worksheet.getRow(4).height = 22;
-  for (let r = 5; r < currentRowNum; r++) {
-    worksheet.getRow(r).height = 20;
-  }
 
   // 7. Write to Buffer and trigger save
   const buffer = await workbook.xlsx.writeBuffer();

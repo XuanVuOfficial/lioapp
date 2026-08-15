@@ -4,7 +4,7 @@ import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Chec
 import { UserProfile, Department, UserRole } from '../types';
 import { createStaffAccount, updateUserRole, deleteUser, updateUserProfile } from '../services/userService';
 import { updateDepartment } from '../services/departmentService';
-import { getAppSettings, AppSettings } from '../services/settingsService';
+import { getAppSettings, subscribeToSettings, AppSettings } from '../services/settingsService';
 import { compressImage } from '../utils/imageUtils';
 
 interface Props {
@@ -18,7 +18,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
-    getAppSettings().then(setAppSettings);
+    const unsub = subscribeToSettings(setAppSettings);
+    return () => unsub();
   }, []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);

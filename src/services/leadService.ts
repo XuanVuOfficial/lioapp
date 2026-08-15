@@ -243,7 +243,7 @@ export const deleteLead = async (lead: Lead): Promise<void> => {
   await executeMutation('leads', 'DELETE', lead, `DELETE FROM leads WHERE id = ${escapeSQL(lead.id)} LIMIT 1`);
 };
 
-export const ESSENTIAL_LEAD_COLUMNS = 'id, creatorEmail, createdAt, assignedToEmail, assignedByEmail, assignedAt, isUpdatedByAssignee, departmentId, projectId, customerCode, customerName, phone, email, status, subStatus, appointmentStatus, resultStatus, interestLevel, updatedAt, updatedByEmail';
+export const ESSENTIAL_LEAD_COLUMNS = 'id, creatorEmail, createdAt, assignedToEmail, assignedByEmail, assignedAt, isUpdatedByAssignee, departmentId, projectId, customerCode, customerName, phone, email, status, subStatus, appointmentStatus, resultStatus, interestLevel, details, notes, history, imageUrl, updatedAt, updatedByEmail';
 
 export interface LeadStatsSummary {
   total: number;

@@ -1,4 +1,4 @@
-import { queryDB, escapeSQL, subscribeDB, executeMutation } from '../api';
+import { queryDB, escapeSQL, subscribeDB, executeMutation, subscribeToMutations } from '../api';
 
 const DOC_ID = 'app_settings';
 
@@ -106,5 +106,21 @@ export const subscribeToSettings = (callback: (settings: AppSettings) => void) =
   }).catch(() => {
     if (isMounted) callback(DEFAULT_SETTINGS);
   });
-  return () => { isMounted = false; };
+
+  const unsubscribe = subscribeToMutations(event => {
+    if (event.entity === 'settings' && isMounted) {
+      if (event.data && !event.data.rollback) {
+        callback(event.data as AppSettings);
+      } else {
+        getAppSettings().then(settings => {
+          if (isMounted) callback(settings);
+        });
+      }
+    }
+  });
+
+  return () => {
+    isMounted = false;
+    unsubscribe();
+  };
 };
