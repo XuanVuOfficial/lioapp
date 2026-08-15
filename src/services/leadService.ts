@@ -217,7 +217,7 @@ export const assignLead = async (id: string, assignedToEmail: string | undefined
       }
 
       // 2. Push & Zalo notification to newly assigned staff (no SĐT)
-      if (_newEmail && _newEmail.toLowerCase() !== _prevEmail.toLowerCase()) {
+      if (_newEmail && _newEmail.toLowerCase() !== (_prevEmail || '').toLowerCase()) {
         let projectName = '';
         if (_projId) {
           try {
