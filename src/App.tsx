@@ -42,15 +42,61 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
+  const handleLogout = (reason?: string) => {
+    localStorage.removeItem('salespro_uid');
+    localStorage.removeItem('salespro_user_pass');
+    setUser(null);
+    setActiveTab('dashboard');
+    if (reason) {
+      alert(reason);
+    }
+  };
+
+  const validateUserSession = async (targetUid: string) => {
+    try {
+      const fresh = await getUserProfile(targetUid);
+      if (!fresh) {
+        handleLogout('Tài khoản không tồn tại hoặc đã bị xóa.');
+        return false;
+      }
+      if (fresh.isLocked) {
+        handleLogout('Tài khoản bị khóa, Vui lòng liên hệ cấp trên.');
+        return false;
+      }
+      const storedPass = localStorage.getItem('salespro_user_pass');
+      if (storedPass && fresh.password && storedPass !== fresh.password) {
+        handleLogout('Mật khẩu của bạn đã được thay đổi. Vui lòng đăng nhập lại.');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Session validation error:', e);
+      return true;
+    }
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const storedUid = localStorage.getItem('salespro_uid');
       if (storedUid) {
         const profile = await getUserProfile(storedUid);
         if (profile) {
-          setUser(profile);
+          if (profile.isLocked) {
+            handleLogout('Tài khoản bị khóa, Vui lòng liên hệ cấp trên.');
+          } else {
+            const storedPass = localStorage.getItem('salespro_user_pass');
+            if (storedPass && profile.password && storedPass !== profile.password) {
+              handleLogout('Mật khẩu của bạn đã được thay đổi. Vui lòng đăng nhập lại.');
+            } else {
+              if (profile.password) {
+                localStorage.setItem('salespro_user_pass', profile.password);
+              }
+              setUser(profile);
+            }
+          }
         } else {
           localStorage.removeItem('salespro_uid');
+          localStorage.removeItem('salespro_user_pass');
         }
       }
       setLoading(false);
@@ -67,11 +113,24 @@ export default function App() {
     }
   }, [user]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('salespro_uid');
-    setUser(null);
-    setActiveTab('dashboard');
-  };
+  // Ping check user status (locked / password changed) when returning to app / reopening
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.uid) {
+        validateUserSession(user.uid);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user) return;
@@ -122,17 +181,17 @@ export default function App() {
     const isHighLevel = ['tgd', 'admin'].includes(effectiveUser.role);
     if (isHighLevel) return 'ALL';
     const ids = effectiveUser.departmentId ? getSubDepartmentIds(effectiveUser.departmentId, departments) : [];
-    return ids.sort().join(',');
+    return ids.slice().sort().join(',');
   }, [effectiveUser?.role, effectiveUser?.departmentId, departments]);
 
+  // Real-time synchronization
   useEffect(() => {
     if (!userRole || !userEmail) return;
 
     const unsubMutations = subscribeToMutations((event) => {
-      // Handle optimistic updates for each entity type
       if (event.entity === 'leads') {
         if (event.type === 'CREATE') {
-          setLeads(prev => [event.data, ...prev]);
+          // Handled via local query / optimistic updates
         } else if (event.type === 'UPDATE') {
           setLeads(prev => prev.map(l => l.id === event.data.id ? { ...l, ...event.data } : l));
         } else if (event.type === 'DELETE') {
@@ -162,12 +221,27 @@ export default function App() {
           setStaff(prev => [event.data, ...prev.filter(s => s.uid !== event.data.uid)]);
         } else if (event.type === 'UPDATE') {
           setStaff(prev => prev.map(s => s.uid === event.data.uid ? { ...s, ...event.data } : s));
-          setUser(prev => prev && prev.uid === event.data.uid ? { ...prev, ...event.data } : prev);
+          if (user && (user.uid === event.data.uid || user.email === event.data.email)) {
+            if (event.data.isLocked) {
+              handleLogout('Tài khoản bị khóa, Vui lòng liên hệ cấp trên.');
+              return;
+            }
+            const storedPass = localStorage.getItem('salespro_user_pass');
+            if (storedPass && event.data.password && storedPass !== event.data.password) {
+              handleLogout('Mật khẩu của bạn đã được thay đổi. Vui lòng đăng nhập lại.');
+              return;
+            }
+            setUser(prev => prev ? { ...prev, ...event.data } : prev);
+          }
         } else if (event.type === 'DELETE') {
+          const deletedId = event.data.uid || event.data.id;
+          if (user && user.uid === deletedId) {
+            handleLogout('Tài khoản không tồn tại hoặc đã bị xóa.');
+            return;
+          }
           if (event.data.rollback) {
              setStaff(prev => [event.data.originalData, ...prev]);
           } else {
-             const deletedId = event.data.uid || event.data.id;
              setStaff(prev => prev.filter(s => s.uid !== deletedId));
           }
         }

@@ -9,6 +9,7 @@ const parseUser = (row: any): UserProfile => {
     } catch(e) {}
   }
   user.mustChangePassword = user.mustChangePassword === '1' || user.mustChangePassword === 1 || user.mustChangePassword === true;
+  user.isLocked = user.isLocked === '1' || user.isLocked === 1 || user.isLocked === true;
   user.createdAt = user.createdAt ? Number(user.createdAt) : undefined;
   user.updatedAt = user.updatedAt ? Number(user.updatedAt) : undefined;
   return user as UserProfile;

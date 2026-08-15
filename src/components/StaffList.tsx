@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check, Lock, Info, Upload } from 'lucide-react';
+import { Search, UserPlus, Mail, User, Briefcase, Shield, Trash2, Edit2, X, Check, Lock, Unlock, Info, Upload } from 'lucide-react';
 import { UserProfile, Department, UserRole } from '../types';
 import { createStaffAccount, updateUserRole, deleteUser, updateUserProfile } from '../services/userService';
 import { updateDepartment } from '../services/departmentService';
@@ -463,6 +463,34 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
     return false;
   };
 
+  const canToggleLock = (targetUser: UserProfile) => {
+    if (targetUser.uid === currentUser.uid) return false;
+    if (currentUser.role === 'tgd') return true;
+    if (currentUser.role === 'admin') {
+      return !['tgd', 'admin'].includes(targetUser.role);
+    }
+    return false;
+  };
+
+  const handleToggleLock = async (targetUser: UserProfile) => {
+    const isCurrentlyLocked = Boolean(targetUser.isLocked);
+    const actionText = isCurrentlyLocked ? 'MỞ KHÓA' : 'KHÓA';
+    const confirmMsg = isCurrentlyLocked
+      ? `Bạn có chắc chắn muốn MỞ KHÓA tài khoản "${targetUser.displayName}" không? Nhân viên sẽ có thể đăng nhập lại vào hệ thống.`
+      : `Bạn có chắc chắn muốn KHÓA tài khoản "${targetUser.displayName}" không? Nhân viên sẽ bị đăng xuất ngay lập tức và không thể đăng nhập.`;
+
+    if (window.confirm(confirmMsg)) {
+      try {
+        await updateUserProfile(targetUser.uid, {
+          isLocked: !isCurrentlyLocked,
+          updatedAt: Date.now()
+        });
+      } catch (err: any) {
+        alert(`Lỗi khi ${actionText.toLowerCase()} tài khoản: ` + (err?.message || err));
+      }
+    }
+  };
+
   const handleShowAddModal = () => {
     setNewUser({
       email: '',
@@ -531,10 +559,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredUsers.map(user => (
-                <tr key={user.uid} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={user.uid} className={`hover:bg-slate-50/50 transition-colors ${user.isLocked ? 'bg-rose-50/20' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold overflow-hidden shrink-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold overflow-hidden shrink-0 ${
+                        user.isLocked ? 'bg-rose-100 text-rose-700 ring-2 ring-rose-200' : 'bg-emerald-100 text-emerald-700'
+                      }`}>
                         {user.avatarUrl ? (
                           <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
@@ -542,7 +572,14 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                         )}
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900">{user.displayName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900">{user.displayName}</p>
+                          {user.isLocked && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 inline-flex items-center gap-1">
+                              <Lock className="w-2.5 h-2.5" /> Đã khóa
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500">{user.email}</p>
                       </div>
                     </div>
@@ -567,7 +604,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     {renderDetailedRoles(user)}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1.5">
                       <button 
                         onClick={() => setInfoUser(user)}
                         title="Thông tin hệ thống"
@@ -575,6 +612,19 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                       >
                         <Info className="w-4 h-4" />
                       </button>
+                      {canToggleLock(user) && (
+                        <button
+                          onClick={() => handleToggleLock(user)}
+                          title={user.isLocked ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+                          className={`p-2 rounded-lg transition-all ${
+                            user.isLocked
+                              ? 'text-rose-600 hover:bg-rose-100 bg-rose-50'
+                              : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                          }`}
+                        >
+                          {user.isLocked ? <Lock className="w-4 h-4 text-rose-600" /> : <Unlock className="w-4 h-4" />}
+                        </button>
+                      )}
                       {canEdit(user) && (
                         <button 
                           onClick={() => handleShowEditModal(user)}
@@ -606,10 +656,12 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
         {/* Mobile List */}
         <div className="md:hidden divide-y divide-slate-100">
           {filteredUsers.map(user => (
-            <div key={user.uid} className="p-4 space-y-3">
+            <div key={user.uid} className={`p-4 space-y-3 ${user.isLocked ? 'bg-rose-50/20' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold shrink-0 overflow-hidden">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 overflow-hidden ${
+                    user.isLocked ? 'bg-rose-100 text-rose-700 ring-2 ring-rose-200' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
                     {user.avatarUrl ? (
                       <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
@@ -617,7 +669,14 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900 truncate">{user.displayName}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-semibold text-slate-900 truncate">{user.displayName}</p>
+                      {user.isLocked && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-200 inline-flex items-center gap-0.5">
+                          <Lock className="w-2.5 h-2.5" /> Đã khóa
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
                 </div>
@@ -629,6 +688,19 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
                   >
                     <Info className="w-4 h-4" />
                   </button>
+                  {canToggleLock(user) && (
+                    <button
+                      onClick={() => handleToggleLock(user)}
+                      title={user.isLocked ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+                      className={`p-2 rounded-lg transition-all ${
+                        user.isLocked
+                          ? 'text-rose-600 hover:bg-rose-100 bg-rose-50'
+                          : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                      }`}
+                    >
+                      {user.isLocked ? <Lock className="w-4 h-4 text-rose-600" /> : <Unlock className="w-4 h-4" />}
+                    </button>
+                  )}
                   {canEdit(user) && (
                     <button 
                       onClick={() => handleShowEditModal(user)}

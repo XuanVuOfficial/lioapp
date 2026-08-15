@@ -20,6 +20,7 @@ export interface UserProfile {
   hireDate?: string;
   phone?: string;
   useridzalo?: string;
+  isLocked?: boolean;
 }
 
 export interface Department {

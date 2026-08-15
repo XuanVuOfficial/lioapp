@@ -630,6 +630,7 @@ async function checkAndRevokeOverdueLeads() {
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS isUpdatedByAssignee TINYINT(1) DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS useridzalo VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS isLocked TINYINT(1) DEFAULT 0;
       ALTER TABLE settings ADD COLUMN IF NOT EXISTS zaloGroupId VARCHAR(100);
     `).catch(() => { });
 

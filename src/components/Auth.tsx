@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Briefcase, LogIn, Mail, Lock, AlertCircle, Save } from 'lucide-react';
-import { verifyCredentials, updateUserProfile } from '../services/userService';
+import { verifyCredentials, updateUserProfile, getUserProfileByEmail } from '../services/userService';
 
 interface Props {
   onLogin: (user: any) => void;
@@ -23,14 +23,28 @@ export const Auth: React.FC<Props> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const profile = await verifyCredentials(email, password);
+      const cleanEmail = email.trim();
+      const userByEmail = await getUserProfileByEmail(cleanEmail);
+      if (userByEmail && userByEmail.isLocked) {
+        setError('Tài khoản bị khóa, Vui lòng liên hệ cấp trên.');
+        setIsLoading(false);
+        return;
+      }
+
+      const profile = await verifyCredentials(cleanEmail, password);
 
       if (profile) {
+        if (profile.isLocked) {
+          setError('Tài khoản bị khóa, Vui lòng liên hệ cấp trên.');
+          return;
+        }
+
         if (profile.mustChangePassword) {
           setTempProfile(profile);
           setRequirePasswordChange(true);
         } else {
           localStorage.setItem('salespro_uid', profile.uid);
+          localStorage.setItem('salespro_user_pass', profile.password || '');
           onLogin(profile);
         }
       } else {
