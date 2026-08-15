@@ -855,56 +855,59 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
             </div>
           </div>
 
-          {/* Staff Filter Button (Opens Staff Search Modal) */}
-          {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
-            <div className="relative w-full md:w-48">
-              <button
-                type="button"
-                onClick={() => {
-                  setStaffFilterSearch('');
-                  setShowStaffFilterModal(true);
-                }}
-                className={`w-full flex items-center justify-between pl-3 pr-2.5 py-2 text-xs sm:text-sm rounded-xl border transition-all text-left truncate cursor-pointer ${selectedStaffEmail
-                  ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold shadow-2xs'
-                  : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
-                  }`}
-              >
-                <div className="flex items-center gap-2 min-w-0 truncate">
-                  <User className={`w-3.5 sm:w-4 h-3.5 sm:h-4 shrink-0 ${selectedStaffEmail ? 'text-emerald-600' : 'text-slate-400'}`} />
-                  <span className="truncate">
-                    {selectedStaffEmail
-                      ? (staff.find(s => s.email.toLowerCase() === selectedStaffEmail.toLowerCase())?.displayName || selectedStaffEmail)
-                      : 'Lọc theo nhân viên'}
-                  </span>
-                </div>
-                {selectedStaffEmail ? (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedStaffEmail('');
-                    }}
-                    className="p-0.5 text-emerald-600 hover:text-rose-600 hover:bg-rose-50 rounded shrink-0 ml-1 transition-colors"
-                    title="Bỏ lọc nhân viên"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-                )}
-              </button>
-            </div>
-          )}
+          {/* Staff Filter & Search: 2 columns on mobile, flex on desktop */}
+          <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:gap-3">
+            {/* Staff Filter Button (Opens Staff Search Modal) */}
+            {['tgd', 'admin', 'gds', 'tp'].includes(user.role) && (
+              <div className="relative flex-1 md:w-48">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffFilterSearch('');
+                    setShowStaffFilterModal(true);
+                  }}
+                  className={`w-full flex items-center justify-between pl-2.5 sm:pl-3 pr-2 sm:pr-2.5 py-2 text-xs sm:text-sm rounded-xl border transition-all text-left truncate cursor-pointer ${selectedStaffEmail
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold shadow-2xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
+                    }`}
+                >
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+                    <User className={`w-3.5 sm:w-4 h-3.5 sm:h-4 shrink-0 ${selectedStaffEmail ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <span className="truncate text-xs sm:text-sm">
+                      {selectedStaffEmail
+                        ? (staff.find(s => s.email.toLowerCase() === selectedStaffEmail.toLowerCase())?.displayName || selectedStaffEmail)
+                        : 'Lọc theo NV'}
+                    </span>
+                  </div>
+                  {selectedStaffEmail ? (
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStaffEmail('');
+                      }}
+                      className="p-0.5 text-emerald-600 hover:text-rose-600 hover:bg-rose-50 rounded shrink-0 ml-1 transition-colors"
+                      title="Bỏ lọc nhân viên"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </span>
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5" />
+                  )}
+                </button>
+              </div>
+            )}
 
-          {/* Search Input */}
-          <div className="relative flex-1 md:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white"
-            />
+            {/* Search Input */}
+            <div className={`relative flex-1 ${['tgd', 'admin', 'gds', 'tp'].includes(user.role) ? 'md:w-56' : 'col-span-2 md:w-56'}`}>
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-8 sm:pl-10 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white"
+              />
+            </div>
           </div>
 
           {/* Action buttons: 2 columns on mobile (Xuất Excel và Thêm mới cùng 1 hàng) */}
@@ -926,23 +929,6 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
           </div>
         </div>
       </div>
-
-      {selectedStaffEmail && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 animate-in fade-in duration-200">
-          <User className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="flex-1 truncate">
-            Đang lọc khách hàng của nhân viên: <strong>{staff.find(s => s.email.toLowerCase() === selectedStaffEmail.toLowerCase())?.displayName || selectedStaffEmail}</strong>
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedStaffEmail('')}
-            className="text-xs font-semibold text-emerald-700 hover:text-rose-600 flex items-center gap-1 shrink-0 ml-1 cursor-pointer"
-          >
-            <X className="w-3 h-3" />
-            <span>Xóa lọc</span>
-          </button>
-        </div>
-      )}
 
       <motion.div
         initial={{ opacity: 0, y: -10 }}
