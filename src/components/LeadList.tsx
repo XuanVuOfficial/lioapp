@@ -1560,7 +1560,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
               <div className="space-y-1">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Nhân viên phụ trách</p>
                 {staff
-                  .filter(s => s.email !== user.email && ((s.displayName || '').toLowerCase().includes((assignSearchTerm || '').toLowerCase()) || (s.email || '').toLowerCase().includes((assignSearchTerm || '').toLowerCase())))
+                  .filter(s => s.email !== user.email && (s.displayName.toLowerCase().includes(assignSearchTerm.toLowerCase()) || s.email.toLowerCase().includes(assignSearchTerm.toLowerCase())))
                   .map(s => {
                     const isSel = showAssignModal.assignedToEmail === s.email;
                     return (
@@ -2285,7 +2285,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900 truncate">
-                      {staff.find(s => s?.email && selectedLead.creatorEmail && s.email.toLowerCase() === selectedLead.creatorEmail.toLowerCase())?.displayName || selectedLead.creatorEmail}
+                      {staff.find(s => s.email.toLowerCase() === selectedLead.creatorEmail?.toLowerCase())?.displayName || selectedLead.creatorEmail}
                     </p>
                     <p className="text-xs text-slate-500 truncate">
                       {selectedLead.creatorEmail} • {new Date(selectedLead.createdAt).toLocaleString('vi-VN')}
@@ -2304,7 +2304,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-900 truncate">
                       {selectedLead.assignedToEmail
-                        ? (staff.find(s => s?.email && selectedLead.assignedToEmail && s.email.toLowerCase() === selectedLead.assignedToEmail.toLowerCase())?.displayName || selectedLead.assignedToEmail)
+                        ? (staff.find(s => s.email.toLowerCase() === selectedLead.assignedToEmail?.toLowerCase())?.displayName || selectedLead.assignedToEmail)
                         : 'Chưa phân công'}
                     </p>
                     <p className="text-xs text-slate-600 truncate">
@@ -2610,7 +2610,7 @@ export const LeadList: React.FC<Props> = ({ leads, departments, user, staff, ini
                     {!newLead.assignedToEmail && <Check className="w-4 h-4 text-amber-600" />}
                   </button>
                   {assignableStaff
-                    .filter(s => ((s.displayName || '').toLowerCase().includes((searchPickerModal.searchTerm || '').toLowerCase()) || (s.email || '').toLowerCase().includes((searchPickerModal.searchTerm || '').toLowerCase())))
+                    .filter(s => s.displayName.toLowerCase().includes(searchPickerModal.searchTerm.toLowerCase()) || s.email.toLowerCase().includes(searchPickerModal.searchTerm.toLowerCase()))
                     .map(s => {
                       const isSel = newLead.assignedToEmail === s.email;
                       return (

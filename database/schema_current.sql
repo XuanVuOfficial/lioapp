@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
     mustChangePassword BOOLEAN DEFAULT FALSE,
     hireDate VARCHAR(50),
     phone VARCHAR(50),
-    useridzalo VARCHAR(255)
+    useridzalo VARCHAR(255),
+    isLocked TINYINT(1) DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS departments (
@@ -63,7 +64,8 @@ CREATE TABLE IF NOT EXISTS leads (
 CREATE TABLE IF NOT EXISTS settings (
     id VARCHAR(50) PRIMARY KEY,
     tabVisibility JSON,
-    roleLimits JSON
+    roleLimits JSON,
+    zaloGroupId VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS user_fcm_tokens (

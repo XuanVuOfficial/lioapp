@@ -77,7 +77,7 @@ export const executeMutation = async (
 export const escapeSQL = (val: any): string => {
   if (val === null || val === undefined) return 'NULL';
   if (typeof val === 'number') return val.toString();
-  if (typeof val === 'boolean') return val ? '1' : '0';
+  if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
   if (typeof val === 'object') {
     val = JSON.stringify(val);
   }

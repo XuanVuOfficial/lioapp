@@ -243,8 +243,8 @@ export const DepartmentHierarchy: React.FC<Props> = ({ departments, user, allUse
   };
 
   const filteredUsers = allUsers.filter(u => 
-    ((u.displayName || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
-     (u.email || '').toLowerCase().includes((searchTerm || '').toLowerCase())) &&
+    (u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     u.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
     u.departmentId !== selectedDeptId
   );
 

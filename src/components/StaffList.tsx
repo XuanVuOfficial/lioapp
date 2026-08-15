@@ -44,8 +44,8 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
   });
 
   const filteredUsers = users.filter(u => 
-    (u.displayName || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
-    (u.email || '').toLowerCase().includes((searchTerm || '').toLowerCase())
+    u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const [selectedFloorId, setSelectedFloorId] = useState<string>('');
@@ -99,7 +99,7 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
       return;
     }
 
-    if (users.some(u => (u.email || '').toLowerCase() === (newUser.email || '').toLowerCase())) {
+    if (users.some(u => u.email.toLowerCase() === newUser.email.toLowerCase())) {
       alert('Email này đã tồn tại trong hệ thống');
       return;
     }
@@ -474,15 +474,14 @@ export const StaffList: React.FC<Props> = ({ users, departments, currentUser }) 
 
   const handleToggleLock = async (targetUser: UserProfile) => {
     const isCurrentlyLocked = Boolean(targetUser.isLocked);
-    const actionText = isCurrentlyLocked ? 'Mở khóa' : 'Khóa';
+    const actionText = isCurrentlyLocked ? 'MỞ KHÓA' : 'KHÓA';
     const confirmMsg = isCurrentlyLocked
-      ? `Bạn có chắc chắn muốn MỞ KHÓA tài khoản "${targetUser.displayName || targetUser.email}" không? Nhân viên sẽ có thể đăng nhập lại vào hệ thống.`
-      : `Bạn có chắc chắn muốn KHÓA tài khoản "${targetUser.displayName || targetUser.email}" không? Nhân viên sẽ bị đăng xuất ngay lập tức và không thể đăng nhập.`;
+      ? `Bạn có chắc chắn muốn MỞ KHÓA tài khoản "${targetUser.displayName}" không? Nhân viên sẽ có thể đăng nhập lại vào hệ thống.`
+      : `Bạn có chắc chắn muốn KHÓA tài khoản "${targetUser.displayName}" không? Nhân viên sẽ bị đăng xuất ngay lập tức và không thể đăng nhập.`;
 
     if (window.confirm(confirmMsg)) {
       try {
         await updateUserProfile(targetUser.uid, {
-          ...targetUser,
           isLocked: !isCurrentlyLocked,
           updatedAt: Date.now()
         });
